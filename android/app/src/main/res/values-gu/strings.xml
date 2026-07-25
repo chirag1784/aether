@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">પ્રમાણ</string>
+    <string name="tagline">હાર્ડવેર-સમર્થિત ઉદ્‌ગમ સાથે ચેડાં-પુરાવારૂપ કૅપ્ચર</string>
+
+    <string name="onboarding_title">શરૂ કરતાં પહેલાં</string>
+    <string name="onboarding_body">પ્રમાણ દરેક ફોટો, વિડિયો અને 360° કૅપ્ચર સાથે તમારા ડિવાઇસનું સ્થાન, સેન્સર અને ઓળખ નોંધે છે, જેથી પછીથી બતાવી શકાય કે રેકોર્ડમાં કોઈ ફેરફાર થયો નથી. ડિજિટલ પર્સનલ ડેટા પ્રોટેક્શન એક્ટ, 2023 હેઠળ આ વ્યક્તિગત ડેટા છે.</string>
+    <string name="onboarding_role_prompt">તમારી ભૂમિકા શું છે?</string>
+    <string name="role_surveyor">વીમા સર્વેયર / નુકસાન આકારણી કરનાર</string>
+    <string name="role_policyholder">પોલિસીધારક (સ્વ-નિરીક્ષણ)</string>
+    <string name="role_investigator">દાવા તપાસનીશ / TPA</string>
+    <string name="role_advocate">વકીલ / વાદી</string>
+    <string name="role_ehs">EHS / ઔદ્યોગિક અધિકારી</string>
+    <string name="consent_purpose_claim">વીમા દાવા મૂલ્યાંકન</string>
+    <string name="consent_purpose_legal">કાનૂની / અદાલતી પુરાવા</string>
+    <string name="consent_accept">હું સમજું છું અને સંમતિ આપું છું</string>
+    <string name="consent_disclaimer_title">આ ઍપ શું નથી કરી શકતી</string>
+    <string name="consent_disclaimer_body">આ ઍપ સાબિત નથી કરી શકતી કે દ્રશ્ય ખરેખર વાસ્તવિક હતું, પુરાવાને આપોઆપ અદાલતમાં માન્ય નથી બનાવી શકતી, અને રૂટ કરેલા ડિવાઇસ તથા વિશિષ્ટ સાધનો ધરાવતા મક્કમ હુમલાખોરને રોકી નથી શકતી. તે ચેડાંને ક્રિપ્ટોગ્રાફિક રીતે શોધી શકાય તેવું બનાવે છે અને તમારા ડિવાઇસે શું કૅપ્ચર કર્યું તેનો સમય-મુદ્રાંક કરે છે.</string>
+
+    <string name="home_title">સેશન</string>
+    <string name="home_new_session">નવું સેશન</string>
+    <string name="home_empty">હજુ સુધી કોઈ સેશન નથી. પુરાવા કૅપ્ચર શરૂ કરવા નવું સેશન શરૂ કરો.</string>
+    <string name="status_draft">ડ્રાફ્ટ</string>
+    <string name="status_sealed">સીલ કરેલ</string>
+    <string name="status_uploaded">અપલોડ કરેલ</string>
+    <string name="status_certified">પ્રમાણિત</string>
+
+    <string name="new_session_title">નવું સેશન</string>
+    <string name="field_claim_number">દાવા નંબર</string>
+    <string name="field_policy_number">પોલિસી નંબર</string>
+    <string name="field_vehicle_reg">વાહન નોંધણી નંબર</string>
+    <string name="field_operator_name">ઓપરેટરનું નામ</string>
+    <string name="checklist_template_motor">મોટર OD — સ્ટાન્ડર્ડ</string>
+    <string name="checklist_template_property">પ્રોપર્ટી / EHS ઘટના સ્થળ</string>
+    <string name="checklist_template_document">દસ્તાવેજ કૅપ્ચર</string>
+    <string name="action_start_preflight">પ્રી-ફ્લાઇટ ચકાસણી શરૂ કરો</string>
+
+    <string name="preflight_title">ડિવાઇસ ચકાસાઈ રહ્યું છે</string>
+    <string name="preflight_signing_key">ડિવાઇસ સાઇનિંગ કી તૈયાર થઈ રહી છે…</string>
+    <string name="preflight_root_check">ડિવાઇસ ઇન્ટિગ્રિટી ચકાસાઈ રહી છે…</string>
+    <string name="preflight_gnss">GPS લૉક થઈ રહ્યું છે…</string>
+    <string name="preflight_gnss_satellites">%1$d સેટેલાઇટ, ચોકસાઈ %2$.0f મીટર</string>
+    <string name="preflight_ready">કૅપ્ચર માટે તૈયાર</string>
+    <string name="preflight_reduced">ઘટેલી વિશ્વસનીયતા — વિગતો જુઓ</string>
+    <string name="preflight_continue">આગળ વધો</string>
+
+    <string name="capture_title">કૅપ્ચર</string>
+    <string name="spoof_clean">સ્થાન: સ્વચ્છ</string>
+    <string name="spoof_suspect">સ્થાન: શંકાસ્પદ</string>
+    <string name="spoof_spoofed">સ્થાન: બનાવટી — કૅપ્ચર અવરોધિત</string>
+    <string name="capture_shutter_cd">શોટ કૅપ્ચર કરો</string>
+    <string name="capture_video_start">રેકોર્ડિંગ શરૂ કરો</string>
+    <string name="capture_video_stop">રેકોર્ડિંગ બંધ કરો</string>
+    <string name="capture_mode_photo">ફોટો</string>
+    <string name="capture_mode_video">વિડિયો</string>
+    <string name="capture_mode_pano">360° (માર્ગદર્શિત)</string>
+    <string name="capture_mode_document">દસ્તાવેજ</string>
+
+    <string name="review_title">સમીક્ષા</string>
+    <string name="assurance_high">ઉચ્ચ વિશ્વસનીયતા</string>
+    <string name="assurance_medium">મધ્યમ વિશ્વસનીયતા</string>
+    <string name="assurance_low">નિમ્ન વિશ્વસનીયતા</string>
+    <string name="review_delete">કાઢી નાખો</string>
+    <string name="review_delete_reason_prompt">કાઢી નાખવાનું કારણ (નોંધાશે)</string>
+
+    <string name="export_title">નિકાસ</string>
+    <string name="export_generate_bundle">પુરાવા બંડલ બનાવો</string>
+    <string name="export_generate_certificate">ભાગ A પ્રમાણપત્ર બનાવો (ડ્રાફ્ટ)</string>
+    <string name="export_certificate_draft_notice">આ પ્રમાણપત્ર એક અહસ્તાક્ષરિત ડ્રાફ્ટ છે. ભારતીય સાક્ષ્ય અધિનિયમ, 2023ની કલમ 63(4) હેઠળ સુપરત કરતાં પહેલાં લાઇસન્સ પ્રાપ્ત ડિજિટલ સહી / આધાર eSign એકીકરણ જરૂરી છે.</string>
+    <string name="export_share">શેર કરો</string>
+
+    <string name="settings_title">સેટિંગ્સ</string>
+    <string name="settings_language">ભાષા</string>
+    <string name="settings_retention">ડેટા જાળવણી</string>
+    <string name="settings_withdraw_consent">સંમતિ પાછી ખેંચો</string>
+    <string name="settings_erase_data">ડેટા ભૂંસવાની વિનંતી કરો</string>
+</resources>

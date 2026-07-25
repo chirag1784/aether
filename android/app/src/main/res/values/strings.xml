@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pramāṇa</string>
+    <string name="tagline">Tamper-evident capture with hardware-backed provenance</string>
+
+    <!-- Onboarding / DPDP consent (Section 10 screen 1, Section 1.4) -->
+    <string name="onboarding_title">Before you begin</string>
+    <string name="onboarding_body">Pramāṇa records your device\'s location, sensors, and identity alongside every photo, video, and 360° capture so that it can later be shown the record has not been altered. This is personal data under the Digital Personal Data Protection Act, 2023.</string>
+    <string name="onboarding_role_prompt">What best describes your role?</string>
+    <string name="role_surveyor">Insurance surveyor / loss assessor</string>
+    <string name="role_policyholder">Policyholder (self-inspection)</string>
+    <string name="role_investigator">Claims investigator / TPA</string>
+    <string name="role_advocate">Advocate / litigant</string>
+    <string name="role_ehs">EHS / industrial officer</string>
+    <string name="consent_purpose_claim">Insurance claim assessment</string>
+    <string name="consent_purpose_legal">Legal / court evidence</string>
+    <string name="consent_accept">I understand and consent</string>
+    <string name="consent_disclaimer_title">What this app cannot do</string>
+    <string name="consent_disclaimer_body">This app cannot prove the scene itself was real, cannot make evidence automatically admissible in court, and cannot defeat a determined attacker with a rooted device and specialised equipment. It makes tampering cryptographically detectable and timestamps what your device captured.</string>
+
+    <!-- Home -->
+    <string name="home_title">Sessions</string>
+    <string name="home_new_session">New session</string>
+    <string name="home_empty">No sessions yet. Start a new session to begin an evidentiary capture.</string>
+    <string name="status_draft">Draft</string>
+    <string name="status_sealed">Sealed</string>
+    <string name="status_uploaded">Uploaded</string>
+    <string name="status_certified">Certified</string>
+
+    <!-- New session -->
+    <string name="new_session_title">New session</string>
+    <string name="field_claim_number">Claim number</string>
+    <string name="field_policy_number">Policy number</string>
+    <string name="field_vehicle_reg">Vehicle registration number</string>
+    <string name="field_operator_name">Operator name</string>
+    <string name="checklist_template_motor">Motor OD — standard</string>
+    <string name="checklist_template_property">Property / EHS incident scene</string>
+    <string name="checklist_template_document">Document capture</string>
+    <string name="action_start_preflight">Start pre-flight check</string>
+
+    <!-- Pre-flight (Section 5 step 0, Section 10 screen 4) -->
+    <string name="preflight_title">Verifying device</string>
+    <string name="preflight_signing_key">Preparing device signing key…</string>
+    <string name="preflight_root_check">Checking device integrity…</string>
+    <string name="preflight_gnss">Locking GPS…</string>
+    <string name="preflight_gnss_satellites">%1$d satellites, accuracy %2$.0f m</string>
+    <string name="preflight_ready">Ready to capture</string>
+    <string name="preflight_reduced">Reduced assurance — see details</string>
+    <string name="preflight_continue">Continue</string>
+
+    <!-- Capture -->
+    <string name="capture_title">Capture</string>
+    <string name="spoof_clean">Location: clean</string>
+    <string name="spoof_suspect">Location: suspect</string>
+    <string name="spoof_spoofed">Location: spoofed — capture blocked</string>
+    <string name="capture_shutter_cd">Capture shot</string>
+    <string name="capture_video_start">Start recording</string>
+    <string name="capture_video_stop">Stop recording</string>
+    <string name="capture_mode_photo">Photo</string>
+    <string name="capture_mode_video">Video</string>
+    <string name="capture_mode_pano">360° (guided)</string>
+    <string name="capture_mode_document">Document</string>
+
+    <!-- Review -->
+    <string name="review_title">Review</string>
+    <string name="assurance_high">HIGH assurance</string>
+    <string name="assurance_medium">MEDIUM assurance</string>
+    <string name="assurance_low">LOW assurance</string>
+    <string name="review_delete">Delete</string>
+    <string name="review_delete_reason_prompt">Reason for deletion (logged)</string>
+
+    <!-- Export -->
+    <string name="export_title">Export</string>
+    <string name="export_generate_bundle">Generate evidence bundle</string>
+    <string name="export_generate_certificate">Generate Part A certificate (draft)</string>
+    <string name="export_certificate_draft_notice">This certificate is an unsigned draft. A licensed digital signature / Aadhaar eSign integration is required before submission under Section 63(4) of the Bharatiya Sakshya Adhiniyam, 2023.</string>
+    <string name="export_share">Share</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_retention">Data retention</string>
+    <string name="settings_withdraw_consent">Withdraw consent</string>
+    <string name="settings_erase_data">Request data erasure</string>
+</resources>

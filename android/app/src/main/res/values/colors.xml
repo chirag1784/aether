@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Deep indigo + warm off-white + amber integrity accent (Section 10) -->
+    <color name="pramana_indigo">#1B1F3B</color>
+    <color name="pramana_indigo_light">#2E345E</color>
+    <color name="pramana_off_white">#F7F4EC</color>
+    <color name="pramana_amber">#D99E30</color>
+    <color name="pramana_green_clean">#2E7D32</color>
+    <color name="pramana_amber_suspect">#B8860B</color>
+    <color name="pramana_red_spoofed">#B3261E</color>
+    <color name="ic_launcher_background">#1B1F3B</color>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- allowBackup is false and this app never uses cloud/device-transfer
+     backup for evidentiary data, but the rule set is declared explicitly
+     (DPDP data-minimisation posture) rather than left to platform defaults. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+    </device-transfer>
+</data-extraction-rules>
