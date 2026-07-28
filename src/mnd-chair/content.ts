@@ -9,7 +9,7 @@ export interface PartInfo {
 export const PARTS: Record<string, PartInfo> = {
   base: { id: 'base', name: 'Base frame', material: 'MS square tube 32×32×2.6mm, fully welded', size: '0.9m × 0.6m footprint', bomGroup: 'base' },
   casters: { id: 'casters', name: 'Locking casters', material: 'Total-lock swivel caster (wheel + swivel)', size: '100mm wheel, ×4', bomGroup: 'base' },
-  mast: { id: 'mast', name: 'Pivot mast', material: 'MS square tube 32×32×2.6mm, welded to base', size: '~0.35m tall', bomGroup: 'base' },
+  mast: { id: 'mast', name: 'Pivot mast', material: 'MS square tube 32×32×2.6mm, welded to base', size: '~10cm stub — pivot sits low, near the base', bomGroup: 'base' },
   leg: { id: 'leg', name: 'Leg board (shin support)', material: 'Plywood/HDPE backing + foam + vinyl', size: '~0.55m × 0.55m', bomGroup: 'board' },
   torso: { id: 'torso', name: 'Torso board (thigh + back + head)', material: 'Plywood/HDPE backing + foam + vinyl', size: '~1.15m × 0.55m', bomGroup: 'board' },
   strut: { id: 'strut', name: 'Gas strut / hydraulic ram', material: 'Rated ≥1.5× patient body weight', size: '~0.6m stroke', bomGroup: 'mechanism' },
@@ -138,7 +138,7 @@ export const dimensions: DimensionRow[] = [
   { measurement: 'Chest strap height (standing)', how: 'Floor to mid-sternum, standing supported', typical: '115–130 cm' },
   { measurement: 'Head wing height', how: 'Floor to ear level, adjustable ±8 cm', typical: '145–165 cm' },
   { measurement: 'Tray table height', how: 'Floor to elbow, seated at ~90°, adjustable', typical: '70–85 cm' },
-  { measurement: 'Knee-break hinge position', how: 'Measured from hip pivot along torso board to the knee crease', typical: '45–55 cm' },
+  { measurement: 'Knee-break hinge position', how: 'Measured from the base pivot, along the leg (shin) board, to the knee crease', typical: '45–55 cm' },
 ]
 
 export interface StructuralNote {
