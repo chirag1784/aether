@@ -12,8 +12,8 @@ export const PARTS: Record<string, PartInfo> = {
   mast: { id: 'mast', name: 'Pivot mast', material: 'MS square tube 32×32×2.6mm, welded to base', size: '~10cm stub — pivot sits low, near the base', bomGroup: 'base' },
   leg: { id: 'leg', name: 'Leg board (shin support)', material: 'Plywood/HDPE backing + foam + vinyl', size: '~0.55m × 0.55m', bomGroup: 'board' },
   torso: { id: 'torso', name: 'Torso board (thigh + back + head)', material: 'Plywood/HDPE backing + foam + vinyl', size: '~1.15m × 0.55m', bomGroup: 'board' },
-  strut: { id: 'strut', name: 'Gas strut / hydraulic ram', material: 'Rated ≥1.5× patient body weight', size: '~0.6m stroke', bomGroup: 'mechanism' },
-  lock: { id: 'lock', name: 'Mechanical drop-pin lock', material: '12mm steel pin, 5 drilled positions', size: 'Flat / 30° / 45° / 60° / standing', bomGroup: 'mechanism' },
+  strut: { id: 'strut', name: 'Worm-gear hand-crank jack', material: 'ACME threaded rod + worm-gear box, self-locking', size: '~0.5m stroke, rated ≥1.5× patient body weight', bomGroup: 'mechanism' },
+  lock: { id: 'lock', name: 'Hand crank handle', material: 'Steel crank arm + knob, folds flat when stowed', size: 'Turns the worm-gear jack', bomGroup: 'mechanism' },
   headwings: { id: 'headwings', name: 'Head wing pads', material: 'Firm foam + vinyl, adjustable bracket', size: '2 × 0.14m pads', bomGroup: 'padding' },
   tray: { id: 'tray', name: 'Tray table', material: '12mm plywood/HDPE laminate, folding arms', size: '0.5m × 0.35m', bomGroup: 'padding' },
   straps: { id: 'straps', name: 'Support straps', material: 'Padded webbing, quick-release buckles', size: 'Chest / pelvis / knee / ankle', bomGroup: 'straps' },
@@ -104,13 +104,13 @@ export interface BomItem {
 
 export const bom: BomItem[] = [
   { part: 'Mild steel square tube', spec: '32×32×2.6 mm — base frame & board sub-frames (load-bearing)', qty: '~20 m', group: 'base' },
-  { part: 'Mild steel flat bar', spec: '25×5 mm — pivot brackets, strut mounts, knee-hinge plates', qty: '~3 m' , group: 'base'},
+  { part: 'Mild steel flat bar', spec: '25×5 mm — pivot brackets, jack mounts, knee-hinge plates', qty: '~3 m' , group: 'base'},
   { part: 'Locking swivel casters', spec: '100 mm wheel, ≥75 kg rated each, total-lock (wheel + swivel)', qty: '4', group: 'base' },
   { part: 'Rust primer + enamel paint', spec: 'Metal primer + top coat, full frame', qty: '1 set', group: 'base' },
   { part: 'Pivot bolt assembly', spec: 'Grade 8.8, 14 mm, flanged bronze bushings, grease nipple', qty: '1', group: 'mechanism' },
   { part: 'Knee-break hinge', spec: 'Heavy-duty piano hinge or flat-bar pin hinge, full board width', qty: '1', group: 'mechanism' },
-  { part: 'Gas strut / hydraulic ram', spec: 'Rated for 1.5× patient body weight, ~600–800 N force class', qty: '1–2 (paired for stability)', group: 'mechanism' },
-  { part: 'Mechanical drop-pin lock', spec: '12 mm pin, bracket drilled at 5 angle positions (flat / 30° / 45° / 60° / standing)', qty: '1', group: 'mechanism' },
+  { part: 'Worm-gear hand-crank jack', spec: 'ACME/trapezoidal threaded rod through a worm-gear box, self-locking — cannot be back-driven by body weight, holds any angle with the crank released, rated ≥1.5× patient body weight', qty: '1', group: 'mechanism' },
+  { part: 'Hand crank handle', spec: 'Folds flat against the mast when not in use, turns the worm-gear jack', qty: '1', group: 'mechanism' },
   { part: 'Marine plywood or 6 mm HDPE backing board', spec: 'Rigid backing under padding — torso board ~110×55 cm, leg board ~65×55 cm', qty: '2 panels', group: 'board' },
   { part: 'High-density base foam', spec: '50 mm, full board area', qty: '2 panels', group: 'padding' },
   { part: 'Pressure-relief foam topper', spec: '25–40 mm, positioned under pelvis/sacrum zone specifically', qty: '1 panel', group: 'padding' },
@@ -150,8 +150,8 @@ export const structuralNotes: StructuralNote[] = [
   { element: 'Base frame', detail: 'Rectangular MS tube perimeter, fully welded corners (no bolted base joints — this is the one sub-assembly that should not be a disassembly point). Cross-braced diagonally under the pivot mast for torsional stiffness.' },
   { element: 'Pivot mast & hip pivot', detail: 'Twin flat-bar plates either side of the board sub-frame, sandwiching a single through-bolt on bronze-bushed bearings. This is the highest-load joint in the structure and the one most worth over-building.' },
   { element: 'Knee-break hinge', detail: 'Full-width hinge (not a single point) spreads bending load across the board rather than concentrating it — a piano hinge the width of the board, or 3 evenly spaced pin hinges, both work.' },
-  { element: 'Gas strut mounting', detail: 'Lower bracket welded to the base mast; upper bracket bolted (not welded) to the underside of the torso board sub-frame — this bolt is also a disassembly point.' },
-  { element: 'Mechanical lock', detail: 'Independent of the strut: a drop-in pin through pre-drilled holes in a quadrant bracket, engaged by the caregiver at the target angle before releasing hand pressure on the strut. This is the load-bearing lock, not the strut.' },
+  { element: 'Worm-gear jack mounting', detail: 'Lower bracket welded to the base mast; upper bracket bolted (not welded) to the underside of the torso board sub-frame — this bolt is also a disassembly point. The worm-gear mesh is self-locking by design — it cannot be back-driven by the patient\'s weight, so the crank holds any angle the moment the caregiver stops turning it, with no separate pin needed.' },
+  { element: 'Hand crank', detail: 'Folds flat against the mast when not in use so it doesn\'t catch on anything during transfers; turning it winds the threaded rod through the worm-gear box to tilt the board.' },
   { element: 'Tray & head-wing brackets', detail: 'Bolted, not welded, onto the torso board sub-frame — both are also disassembly points and are the lightest-load joints, so standard M8 bolts are adequate.' },
 ]
 
@@ -161,10 +161,10 @@ export interface Step {
 }
 
 export const disassembleSteps: Step[] = [
-  { title: 'Recline to the flat/lying position and empty the board', body: 'Crank or pump to the fully flat angle and transfer the patient off first, following your normal routine, before any tools come out.' },
-  { title: 'Mark every bolt hole with a paint pen', body: 'Pivot bolt, strut bracket, knee hinge (if bolted), head-wing brackets, tray brackets. This guarantees reassembly always lands in the same holes, keeping the fit calibrated to the patient.' },
+  { title: 'Crank to the flat/lying position and empty the board', body: 'Wind the hand crank to the fully flat angle and transfer the patient off first, following your normal routine, before any tools come out.' },
+  { title: 'Mark every bolt hole with a paint pen', body: 'Pivot bolt, jack bracket, knee hinge (if bolted), head-wing brackets, tray brackets. This guarantees reassembly always lands in the same holes, keeping the fit calibrated to the patient.' },
   { title: 'Remove the tray table and head wings', body: 'Both are bolted sub-assemblies — unbolt and set aside first, they are the lightest pieces.' },
-  { title: 'Disconnect the gas strut\'s upper bracket', body: 'Unbolt where the strut meets the torso board. The strut and its lower bracket stay with the base.' },
+  { title: 'Disconnect the worm-gear jack\'s upper bracket', body: 'Unbolt where the jack meets the torso board. The jack, crank, and its lower bracket stay with the base.' },
   { title: 'Support the board, then remove the pivot bolt', body: 'With one person holding the board steady, withdraw the pivot bolt. The full board assembly (torso + leg board, still hinged together at the knee) lifts off the base as one piece.' },
   { title: 'Four to six pieces, ready to move', body: 'Base + mast + casters (heaviest, two people), the board assembly, the head wings, and the tray table.' },
 ]
@@ -172,7 +172,7 @@ export const disassembleSteps: Step[] = [
 export const reassembleSteps: Step[] = [
   { title: 'Base first', body: 'Set the base + mast down, casters unlocked, on level ground.' },
   { title: 'Refit the board at the pivot', body: 'Line up the paint marks, drop the pivot bolt through, torque to snug + a quarter turn, fit the locknut.' },
-  { title: 'Reconnect the gas strut bracket', body: 'Same paint-marked hole. Cycle it once through a small range by hand to confirm free movement before loading it.' },
+  { title: 'Reconnect the worm-gear jack bracket', body: 'Same paint-marked hole. Crank it once through a small range by hand to confirm free, smooth movement before loading it.' },
   { title: 'Rebolt the head wings and tray table', body: 'Both to their marked positions.' },
   { title: 'Re-run the full load test', body: 'Every time — after any reassembly, repeat the sandbag load test from §8 before the patient is placed in it again. A refit is a new build, safety-wise.' },
 ]
@@ -180,7 +180,7 @@ export const reassembleSteps: Step[] = [
 export const safetyChecklist: string[] = [
   'All four casters locked before any transfer or angle change',
   'Chest, pelvic, knee and ankle straps fastened and checked snug — but not restrictive',
-  'Mechanical drop-pin engaged at the target angle, not just resting on the strut',
+  'Hand crank released fully at the target angle and confirmed to hold with no creep before letting go of the board',
   'No one leaves the patient unattended while reclined above the flat position',
   'Angle changes made in small increments with a pause to check colour and breathing at each step (orthostatic hypotension precaution)',
   'Seated/reclined duration limited to about 2 hours before a position change or pressure-relief break',

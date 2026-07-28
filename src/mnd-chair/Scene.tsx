@@ -152,12 +152,26 @@ function Rig({ state, onSelect }: { state: ViewState; onSelect: (id: string) => 
         </mesh>
       </Selectable>
 
-      {/* ---- gas strut (visual approximation) ---- */}
+      {/* ---- worm-gear hand-crank jack (self-locking, visual approximation) ---- */}
       <Selectable id="strut" onSelect={onSelect}>
         <group ref={strutGroup} position={[0.14, BASE_Y + 0.05, PIVOT[2] + 0.05]}>
           <mesh castShadow position={[0, 0.18, 0]}>
             <cylinderGeometry args={[0.018, 0.018, 0.36, 12]} />
             <meshStandardMaterial color={COLORS.steelDark} metalness={0.85} roughness={0.2} />
+          </mesh>
+        </group>
+      </Selectable>
+
+      {/* ---- hand crank handle, folds against the jack body when stowed ---- */}
+      <Selectable id="lock" onSelect={onSelect}>
+        <group position={[0.14, BASE_Y + 0.05, PIVOT[2] + 0.05]}>
+          <mesh castShadow position={[0.06, 0.02, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.008, 0.008, 0.09, 8]} />
+            <meshStandardMaterial color={COLORS.ink} metalness={0.6} roughness={0.4} />
+          </mesh>
+          <mesh castShadow position={[0.1, 0.02, 0]}>
+            <cylinderGeometry args={[0.014, 0.014, 0.03, 10]} />
+            <meshStandardMaterial color={COLORS.strap} metalness={0.3} roughness={0.5} />
           </mesh>
         </group>
       </Selectable>
@@ -176,13 +190,6 @@ function Rig({ state, onSelect }: { state: ViewState; onSelect: (id: string) => 
           <mesh castShadow position={[0, 0.02, 0.09]} rotation={[Math.PI / 2.6, 0, 0]}>
             <boxGeometry args={[0.3, 0.22, 0.02]} />
             <meshStandardMaterial color={COLORS.foot} roughness={0.8} />
-          </mesh>
-        </Selectable>
-
-        <Selectable id="lock" onSelect={onSelect}>
-          <mesh castShadow position={[-0.18, 0.06, 0.06]}>
-            <cylinderGeometry args={[0.012, 0.012, 0.12, 10]} />
-            <meshStandardMaterial color={COLORS.strap} metalness={0.4} roughness={0.4} />
           </mesh>
         </Selectable>
 

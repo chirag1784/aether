@@ -103,8 +103,8 @@ export default function App() {
           <p className="max-w-[62ch] mt-3 text-[15.5px]" style={{ color: 'var(--ink-soft)' }}>
             A full-body-support welded frame for a patient who cannot move or brace any part of the body — reclines
             flat for transfer, tilts to a supported recline for rest, and tilts upright to supported standing, all
-            through a single hinged padded board and a locking gas-strut mechanism. Built to match a proven
-            commercial tilt-table pattern, sized and specified for home fabrication with welding access.
+            through a single hinged padded board and a self-locking worm-gear hand-crank jack. Built to match a
+            proven commercial tilt-table pattern, sized and specified for home fabrication with welding access.
           </p>
         </div>
       </header>
