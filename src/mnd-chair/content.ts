@@ -1,23 +1,27 @@
 export interface PartInfo {
   id: string
+  number: string
   name: string
   material: string
   size: string
   bomGroup: string
 }
 
+// Numbering is locked: 1000s support/comfort, 1010s structure/mechanism, 1020s mobility, 1030s straps.
+// Keep this in sync with the Master Build Reference PDF — do not renumber without updating that document too.
 export const PARTS: Record<string, PartInfo> = {
-  base: { id: 'base', name: 'Base frame', material: 'MS square tube 32×32×2.6mm, fully welded', size: '0.9m × 0.6m footprint', bomGroup: 'base' },
-  casters: { id: 'casters', name: 'Locking casters', material: 'Total-lock swivel caster (wheel + swivel)', size: '100mm wheel, ×4', bomGroup: 'base' },
-  mast: { id: 'mast', name: 'Pivot mast', material: 'MS square tube 32×32×2.6mm, welded to base', size: '~10cm stub — pivot sits low, near the base', bomGroup: 'base' },
-  leg: { id: 'leg', name: 'Leg board (shin support)', material: 'Plywood/HDPE backing + foam + vinyl', size: '~0.55m × 0.55m', bomGroup: 'board' },
-  torso: { id: 'torso', name: 'Torso board (thigh + back + head)', material: 'Plywood/HDPE backing + foam + vinyl', size: '~1.15m × 0.55m', bomGroup: 'board' },
-  strut: { id: 'strut', name: 'Worm-gear hand-crank jack', material: 'ACME threaded rod + worm-gear box, self-locking', size: '~0.5m stroke, rated ≥1.5× patient body weight', bomGroup: 'mechanism' },
-  lock: { id: 'lock', name: 'Hand crank handle', material: 'Steel crank arm + knob, folds flat when stowed', size: 'Turns the worm-gear jack', bomGroup: 'mechanism' },
-  headwings: { id: 'headwings', name: 'Head wing pads', material: 'Firm foam + vinyl, adjustable bracket', size: '2 × 0.14m pads', bomGroup: 'padding' },
-  tray: { id: 'tray', name: 'Tray table', material: '12mm plywood/HDPE laminate, folding arms', size: '0.5m × 0.35m', bomGroup: 'padding' },
-  straps: { id: 'straps', name: 'Support straps', material: 'Padded webbing, quick-release buckles', size: 'Chest / pelvis / knee / ankle', bomGroup: 'straps' },
-  footplate: { id: 'footplate', name: 'Footplate', material: 'MS flat bar + non-slip pad', size: '0.3m × 0.22m', bomGroup: 'board' },
+  headwings: { id: 'headwings', number: '1001', name: 'Headrest', material: 'Telescoping post + firm foam/vinyl wing pads, adjustable bracket', size: 'Height 145–165cm, 2 × 0.14m pads', bomGroup: 'padding' },
+  armrest: { id: 'armrest', number: '1002', name: 'Armrests', material: 'Steel arm + foam/vinyl pad', size: 'Pair, fixed to torso board', bomGroup: 'padding' },
+  torso: { id: 'torso', number: '1003', name: 'Torso/back board panel', material: 'Plywood/HDPE backing + foam + vinyl', size: '~1.15m × 0.55m', bomGroup: 'board' },
+  leg: { id: 'leg', number: '1004', name: 'Leg/calf board panel', material: 'Plywood/HDPE backing + foam + vinyl', size: '~0.55m × 0.55m', bomGroup: 'board' },
+  footplate: { id: 'footplate', number: '1005', name: 'Footplate', material: 'MS flat bar + non-slip pad', size: '0.3m × 0.22m, fixed near the pivot', bomGroup: 'board' },
+  tray: { id: 'tray', number: '1006', name: 'Tray table', material: '12mm plywood/HDPE laminate, folding swing arms', size: '0.5m × 0.35m, rotates fully clear for transfers', bomGroup: 'padding' },
+  mast: { id: 'mast', number: '1010', name: 'Pivot bracket', material: 'Twin flat-bar plates, M14 bolt, bronze bushings, grease nipple', size: 'Highest-load joint — over-build this one', bomGroup: 'base' },
+  strut: { id: 'strut', number: '1012', name: 'ACME threaded rod', material: 'Trapezoidal lead screw + bronze nut, self-locking by the thread', size: '~0.5m stroke, rated ≥1.5× patient body weight', bomGroup: 'mechanism' },
+  lock: { id: 'lock', number: '1013', name: 'Hand crank', material: 'Steel crank arm + knob, folds flat when stowed', size: 'Turns 1012 — no gearbox needed at this load', bomGroup: 'mechanism' },
+  base: { id: 'base', number: '1014', name: 'Base frame', material: 'MS square tube 32×32×2.6mm, fully welded', size: '0.9m × 0.6m footprint', bomGroup: 'base' },
+  casters: { id: 'casters', number: '1020', name: 'Locking casters', material: 'Total-lock swivel caster (wheel + swivel)', size: '100mm wheel, ×4, ≥75kg rated each', bomGroup: 'base' },
+  straps: { id: 'straps', number: '1030–1034', name: 'Support straps', material: 'Padded webbing, ladder-lock + quick-release buckles', size: 'Chest / shoulder / pelvic / knee / ankle — fixed anchor points, never repositioned', bomGroup: 'straps' },
 }
 
 export interface Citation {
@@ -184,4 +188,21 @@ export const safetyChecklist: string[] = [
   'No one leaves the patient unattended while reclined above the flat position',
   'Angle changes made in small increments with a pause to check colour and breathing at each step (orthostatic hypotension precaution)',
   'Seated/reclined duration limited to about 2 hours before a position change or pressure-relief break',
+]
+
+export interface ProcedureStep {
+  n: number
+  title: string
+  body: string
+}
+
+export const patientProcedure: ProcedureStep[] = [
+  { n: 1, title: 'Position & lock', body: 'Crank the board fully flat. Lock all four casters. Position the chair directly alongside the bed or wheelchair, matched as closely as possible to the same height.' },
+  { n: 2, title: 'Transfer onto the flat board', body: 'For a patient who cannot assist at all, this is not a one-person lift. Use a slide sheet/slide board with two caregivers, or a mobile hoist to lower the patient onto the board. The flat board makes the transfer itself easier — it does not remove the need for proper transfer technique or a second person.' },
+  { n: 3, title: 'Apply straps, in order: feet → knees → pelvis → chest → shoulders → head', body: "Working feet-first means every strap you fasten after that is holding the patient more securely, not less — you're never tightening a strap above a limb that's still free to slide." },
+  { n: 4, title: 'Crank to reclined rest', body: 'Small, steady turns. Watch the patient\'s face, not just the angle. This is the resting/day position — torso ~74° from vertical, tray table down if wanted.' },
+  { n: 5, title: 'Crank toward standing, in increments of about 10–15°', body: 'Pause 2–3 minutes at each increment. Watch specifically for dizziness, facial pallor, or a reported "head rush" — early signs of orthostatic hypotension, the main medical risk of this whole exercise. Reverse immediately if any of these appear.' },
+  { n: 6, title: 'At full standing (~4° from vertical)', body: 'Confirm every strap is still snug (they can loosen slightly through the motion), feet are flat and centred on the footplate, and weight is visibly going through the straps and board — not through the patient holding themselves up.' },
+  { n: 7, title: 'Reverse in the same increments', body: 'Same pause discipline coming down as going up.' },
+  { n: 8, title: 'Unstrap in reverse order: shoulders → chest → pelvis → knees → feet', body: 'Then transfer off using the same technique as step 2.' },
 ]

@@ -234,6 +234,17 @@ function Rig({ state, onSelect }: { state: ViewState; onSelect: (id: string) => 
               <meshStandardMaterial color={COLORS.gold} roughness={0.7} />
             </mesh>
           </Selectable>
+
+          <Selectable id="armrest" onSelect={onSelect}>
+            <mesh castShadow position={[-0.29, 0.5, 0.05]}>
+              <boxGeometry args={[0.05, 0.03, 0.3]} />
+              <meshStandardMaterial color={COLORS.steelDark} metalness={0.5} roughness={0.5} />
+            </mesh>
+            <mesh castShadow position={[0.29, 0.5, 0.05]}>
+              <boxGeometry args={[0.05, 0.03, 0.3]} />
+              <meshStandardMaterial color={COLORS.steelDark} metalness={0.5} roughness={0.5} />
+            </mesh>
+          </Selectable>
         </group>
       </group>
     </group>

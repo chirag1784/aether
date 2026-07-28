@@ -8,6 +8,7 @@ import {
   disassembleSteps,
   reassembleSteps,
   safetyChecklist,
+  patientProcedure,
   PARTS,
   type BomItem,
 } from './content'
@@ -31,6 +32,7 @@ const GROUP_LABEL: Record<BomItem['group'], string> = {
 function Nav() {
   const links = [
     ['overview', 'Overview'],
+    ['usage', 'How it’s used'],
     ['configurator', '3D configurator'],
     ['research', 'Ergonomics research'],
     ['dimensions', 'Dimensions'],
@@ -133,8 +135,36 @@ export default function App() {
           </Callout>
         </section>
 
+        <section id="usage" className="section py-10 border-b" style={{ borderColor: 'var(--line)' }}>
+          <SectionHeading kicker="02 — Procedure" title="How a patient with zero mobility actually uses this" />
+          <p className="max-w-[66ch] text-[15.5px] mb-4">
+            This is the part that matters most and is easiest to get wrong in a diagram. A board that tilts is only
+            useful if the sequence around it is right.
+          </p>
+          <ol className="space-y-4 max-w-[70ch]">
+            {patientProcedure.map((s) => (
+              <li key={s.n} className="border-t pt-3" style={{ borderColor: 'var(--line)' }}>
+                <div className="flex gap-3">
+                  <span className="font-mono text-[12px]" style={{ color: 'var(--orange)' }}>
+                    {String(s.n).padStart(2, '0')}
+                  </span>
+                  <div>
+                    <h4 className="font-semibold text-[14.5px] mb-0.5">{s.title}</h4>
+                    <p className="text-[13.5px]" style={{ color: 'var(--ink-soft)' }}>{s.body}</p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <Callout tone="safety" label="This is not a hoist">
+            It is a positioning and standing device. It does not replace a hoist for the bed-to-board transfer if
+            the patient has zero voluntary movement — plan that part with whoever already handles the patient's
+            transfers day to day.
+          </Callout>
+        </section>
+
         <section id="configurator" className="section py-10 border-b" style={{ borderColor: 'var(--line)' }}>
-          <SectionHeading kicker="02 — Interactive model" title="3D configurator" />
+          <SectionHeading kicker="03 — Interactive model" title="3D configurator" />
           <p className="max-w-[66ch] text-[15.5px] mb-4">
             Drag to orbit. Step through the four states below, or click any part of the model to see its material
             and size. This mirrors exactly how the physical frame assembles and disassembles.
@@ -168,6 +198,9 @@ export default function App() {
             <div className="px-4 py-3 border-t min-h-[64px]" style={{ borderColor: 'var(--line)' }}>
               {part ? (
                 <div className="flex flex-wrap gap-x-8 gap-y-1 items-baseline">
+                  <span className="font-mono text-[13px]" style={{ color: 'var(--steel)' }}>
+                    {part.number}
+                  </span>
                   <span className="font-display text-[14px]" style={{ color: 'var(--orange)' }}>
                     {part.name}
                   </span>
@@ -188,7 +221,7 @@ export default function App() {
         </section>
 
         <section id="research" className="section py-10 border-b" style={{ borderColor: 'var(--line)' }}>
-          <SectionHeading kicker="03 — Research" title="Ergonomic &amp; clinical grounding" />
+          <SectionHeading kicker="04 — Research" title="Ergonomic &amp; clinical grounding" />
           <p className="max-w-[66ch] text-[15.5px] mb-6">
             Every design decision below traces back to published seating, standing-frame and pressure-care guidance
             for progressive neuromuscular conditions, not assumption.
@@ -217,7 +250,7 @@ export default function App() {
         </section>
 
         <section id="dimensions" className="section py-10 border-b" style={{ borderColor: 'var(--line)' }}>
-          <SectionHeading kicker="04 — Fit" title="Measure before you cut steel" />
+          <SectionHeading kicker="05 — Fit" title="Measure before you cut steel" />
           <p className="max-w-[66ch] text-[15.5px] mb-4">
             Every dimension should come from the patient's own body, taken lying down (the whole board is
             measurable flat, unlike a seated-only chair).
@@ -245,7 +278,7 @@ export default function App() {
         </section>
 
         <section id="bom" className="section py-10 border-b" style={{ borderColor: 'var(--line)' }}>
-          <SectionHeading kicker="05 — Materials" title="Full parts list" />
+          <SectionHeading kicker="06 — Materials" title="Full parts list" />
           {(['base', 'mechanism', 'board', 'padding', 'straps', 'hardware'] as const).map((group) => (
             <div key={group} className="mb-6">
               <h3 className="font-display text-[13px] tracking-wide mb-2" style={{ color: 'var(--steel)' }}>
@@ -271,7 +304,7 @@ export default function App() {
         </section>
 
         <section id="structure" className="section py-10 border-b" style={{ borderColor: 'var(--line)' }}>
-          <SectionHeading kicker="06 — Structure" title="Structural elements" />
+          <SectionHeading kicker="07 — Structure" title="Structural elements" />
           <div className="space-y-5 max-w-[70ch]">
             {structuralNotes.map((s) => (
               <div key={s.element}>
@@ -283,7 +316,7 @@ export default function App() {
         </section>
 
         <section id="assembly" className="section py-10 border-b" style={{ borderColor: 'var(--line)' }}>
-          <SectionHeading kicker="07 — Assembly" title="Disassembly &amp; reassembly" />
+          <SectionHeading kicker="08 — Assembly" title="Disassembly &amp; reassembly" />
           <p className="max-w-[66ch] text-[15.5px] mb-6">
             The frame separates at bolts it was built with anyway — for moving house, doorways, cleaning, or
             transport.
@@ -325,7 +358,7 @@ export default function App() {
         </section>
 
         <section id="safety" className="section py-10">
-          <SectionHeading kicker="08 — Safety" title="Testing &amp; checklist" />
+          <SectionHeading kicker="09 — Safety" title="Testing &amp; checklist" />
           <Callout tone="safety" label="Load-test empty, every time, before first use">
             Load the board with sandbags to 1.5× patient body weight, cycle through the full range slowly twice, and
             check every weld and bolt after. Only proceed to a human trial once this passes with no flex or
