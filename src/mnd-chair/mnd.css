@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #efe9dd;
+  --paper-2: #e4dcc8;
+  --paper-3: #dcd2ba;
+  --ink: #1d2229;
+  --ink-soft: #4c5761;
+  --line: #c9bea4;
+  --orange: #b8501f;
+  --orange-soft: #b8501f1a;
+  --steel: #2e5266;
+  --steel-soft: #6e8a9a;
+  --steel-wash: #2e526612;
+  --gold: #a67c1e;
+  --teal: #3e7a6b;
+  --font-display: "Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed", Arial, sans-serif;
+  --font-body: "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14181d;
+    --paper-2: #1b2129;
+    --paper-3: #232b33;
+    --ink: #eae4d6;
+    --ink-soft: #9ca7ae;
+    --line: #333c45;
+    --orange: #e38249;
+    --orange-soft: #e382491a;
+    --steel: #87b4c9;
+    --steel-soft: #4f7488;
+    --steel-wash: #87b4c912;
+    --gold: #d4aa3e;
+    --teal: #6fb3a0;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--orange-soft);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+a {
+  color: var(--steel);
+}
+
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
