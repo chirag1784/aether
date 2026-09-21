@@ -1,0 +1,9 @@
+# dist/index.html is the deployed artifact, so it is tracked. The repository
+# root .gitignore excludes every directory named `dist`; this re-includes ours.
+!dist/
+dist/bundle.debug.js
+
+node_modules/
+.env
+.env.local
+*.log
