@@ -26,6 +26,15 @@ export const S = {
   chatOpen: false,
   chat: [],
   chatBusy: false,
+  // The assistant's authority: ASK queues each write for confirmation, ACT
+  // applies it and records an Undo. The user sets this in Settings.
+  chatAutonomy: 'ASK',
+  chatToolLog: [],
+  // Where research findings may come from in this deployment.
+  researchConnector: '',
+  // undefined until the runtime has been asked; then the reachable list.
+  researchConnectorsSeen: undefined,
+  researchTab: 'gaps',
   nodeTab: 'worksheet',
   filters: {},
   selection: {},

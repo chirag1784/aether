@@ -15,7 +15,7 @@ three places.
 ## Rules that are not negotiable
 
 These are enforced in code and asserted by tests. Do not weaken one to make a
-feature easier.
+feature easier. There are nine.
 
 1. **Deterministic code calculates; the model drafts and explains.** Risk
    scores, unit conversions, threshold comparisons, renewal dates and
@@ -38,10 +38,23 @@ feature easier.
 6. **The AI layer has no path to a conclusion.** It cannot set a confirmed
    applicability status, mark compliance verified, close a recommendation,
    approve a report, or add a deviation the guideword engine did not emit. The
-   guards are in `packages/domain/status.js` and are covered by tests.
+   guards are in `packages/domain/status.js` and are covered by tests. The
+   assistant otherwise has full authority: it reads every collection and writes
+   records through the same audited path a human edit takes, with an autonomy
+   setting the user owns and an Undo on every change. See `docs/ASSISTANT.md`.
 7. **Every mutation is audited and every value carries provenance.** Use
    `store.create/update/remove`, which handle ids, timestamps, revisions and
    the audit bucket. Do not write to a backend directly from a view.
+8. **A researched value is never a verified one.** `WEB_SOURCED` means a
+   document was cited; `VERIFIED` means a named engineer read it and signed for
+   the figure. `attestedStatus()` maps model recall to `AI_INFERRED`, which the
+   alert and threshold engines refuse to use, and no path promotes it. See
+   `docs/RESEARCH.md`.
+9. **A scenario never moves on the risk matrix because somebody hoped.** The
+   before-and-after picture credits a residual rating only where one has been
+   recorded AND a selected recommendation of the recorded basis kind addresses
+   the row (`basisCredit()`). A recommendation whose effort is undeclared is
+   left out of the ranking rather than assumed cheap. See `docs/DIAGRAMS.md`.
 
 ## Conventions
 
@@ -56,6 +69,16 @@ feature easier.
 * **New module**: add it to `MODULES` in `build.mjs` in dependency order. The
   build fails on a duplicate top-level identifier — rename the local helper, or
   hoist it into the package where it belongs.
+* **New diagram**: the geometry goes in `packages/diagrams/geometry.js` and
+  returns plain data; `app/diagrams.js` turns it into SVG with the `svg()`
+  helper from `app/util.js`. A diagram uses the `--risk-*` tokens and never its
+  own palette. Cap its width — a matrix blown up to fill a wide card is harder
+  to read.
+* **New assistant tool**: add it in `app/ai-tools.js`. A write tool goes
+  through `doWrite()` so the autonomy setting and the ledger apply; name its
+  collection and fields in `WRITABLE`. A tool result is the assistant's only
+  source of truth about what happened, so return a sentence that says plainly
+  whether the write was done, queued, refused or failed.
 * **Capabilities**: every runtime capability is optional. Branch on absence and
   say in the UI what is unavailable and what still works. Never let a missing
   capability break a page.
@@ -65,8 +88,8 @@ feature easier.
 ## Before you commit
 
 ```sh
-node --test tests/*.test.mjs   # must be 95/95 or better
-node build.mjs                 # must pass both bundler invariants
+node --test tests/*.test.mjs   # must be 158/158 or better
+node build.mjs                 # must pass all three bundler invariants
 ```
 
 Then update `docs/TASKS.md`. A phase is done only when the feature works, the

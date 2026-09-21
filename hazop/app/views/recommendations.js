@@ -6,6 +6,7 @@ import { S, go, render, project, scoped, recommendationRegister, nodeById, matri
 import { tryRiskFromLS } from '../../packages/calculations/risk.js';
 import { canCloseRecommendation, REC_STATUS } from '../../packages/domain/status.js';
 import { assessRecommendationQuality, CONTROL_LEVELS } from '../../packages/calculations/dedup.js';
+import { EFFORT_FIELDS, doability, DOABILITY_BANDS, rankRecommendations, recRef } from '../../packages/calculations/doability.js';
 
 export function renderRecommendations() {
   const p = project();
@@ -35,6 +36,8 @@ export function renderRecommendations() {
       h('div', { class: 'note warn', style: { 'margin-top': '12px' } }, h('strong', { text: quality.length + ' recommendation(s) need attention before the report: ' }), h('ul', { class: 'list-compact small', style: { 'margin-top': '5px' } }, quality.slice(0, 6).map((x) => h('li', {}, h('span', { class: 'mono', text: x.r.recId || '—' }), ' ', x.q.issues.map((i) => i.detail).join(' ')))))
     );
   }
+
+  page.appendChild(doabilityStrip(reg, m));
 
   if (reg.merges.length) {
     page.appendChild(sectionRule('Deduplication'));
@@ -85,6 +88,80 @@ export function renderRecommendations() {
   return page;
 }
 
+/**
+ * How much of this register can actually be sequenced, and what the honest
+ * order is. It sits above the table because "which of these first" is the
+ * question a plant asks the moment the workshop ends.
+ */
+function doabilityStrip(reg, m) {
+  const ranking = rankRecommendations({ recommendations: reg.kept, matrix: m, scenarios: scoped('scenarios'), partial: true });
+  const box = h('div', {});
+  box.appendChild(sectionRule('Practicability', h('button', { class: 'btn sm', text: 'See the before-and-after picture', onclick: () => go('risk') })));
+
+  if (ranking.scored.length === 0) {
+    box.appendChild(
+      h(
+        'div',
+        { class: 'note warn' },
+        h('strong', { text: 'No action has its effort declared, so the register cannot be sequenced. ' }),
+        'Open any recommendation and answer the seven effort questions — cost, lead time, outage, engineering, who does the work, external approval, space. The engine will not guess them, because a wrong guess produces a wrong priority order and that is worse than none.'
+      )
+    );
+    return box;
+  }
+
+  const counts = ranking.counts;
+  box.appendChild(
+    h(
+      'div',
+      { class: 'grid c4' },
+      DOABILITY_BANDS.map((b) => {
+        const n = ranking.scored.filter((x) => x.doability.band === b.key).length;
+        return tile(b.label, String(n), b.note, b.key === 'DO_NOW' ? 'ok' : b.key === 'PROJECT' ? 'alert' : null);
+      })
+    )
+  );
+  if (counts.undecidable) {
+    box.appendChild(
+      h('p', {
+        class: 'muted small',
+        text:
+          counts.undecidable +
+          ' action(s) are not in that count because their effort is undeclared. They are left out of the ranking rather than assumed easy.',
+      })
+    );
+  }
+
+  const top = ranking.byValue.slice(0, 5);
+  if (top.length) {
+    box.appendChild(
+      h(
+        'div',
+        { class: 'card' },
+        h('h3', { class: 'card-title', text: 'Most risk removed per unit of effort' }),
+        h(
+          'ol',
+          { class: 'list-compact small', style: { margin: '4px 0 0 18px' } },
+          top.map((x) =>
+            h(
+              'li',
+              {},
+              h('span', { class: 'mono', text: recRef(x.recommendation) }),
+              ' ' + truncate(x.recommendation.text, 110) + ' ',
+              h('span', { class: 'muted', text: '(' + x.doability.bandLabel.toLowerCase() + ', ' + (x.benefit.measured ? 'removes ' + x.benefit.riskDelta + ' of risk magnitude' : 'benefit not quantified — no residual rating') + ')' })
+            )
+          )
+        ),
+        h('p', {
+          class: 'card-note',
+          text: 'Risk removed is the drop in the matrix magnitude across the rows this action is raised against, using only residual ratings the team has actually recorded. Where none is recorded the benefit is unquantified, not zero.',
+        })
+      )
+    );
+  }
+  return box;
+}
+
 function statusClass(s) {
   const map = { OPEN: 'missing', IN_PROGRESS: 'extracted', AWAITING_EVIDENCE: 'sourced', CLOSED: 'verified', REJECTED: 'na', DEFERRED: 'inferred' };
   return map[s || 'OPEN'] || 'missing';
@@ -102,6 +179,22 @@ function recDrawer(r) {
   const evidenceList = (r.evidence || []);
   const q = assessRecommendationQuality(r);
 
+  // Effort: what the doability engine needs before this action can be ranked
+  // or credited in the before-and-after picture. Blank means undeclared, which
+  // keeps the action out of the ranking rather than assuming it is cheap.
+  const effortInputs = {};
+  const effortGrid = h('div', { class: 'grid c2' });
+  for (const f of EFFORT_FIELDS) {
+    const sel = select(
+      [{ value: '', label: 'not declared' }].concat(f.options.map((o) => ({ value: o.value, label: o.label }))),
+      ((r.effort || {})[f.key]) || '',
+      { id: 'rr-eff-' + f.key }
+    );
+    effortInputs[f.key] = sel;
+    effortGrid.appendChild(field(f.label, sel, f.question));
+  }
+  const scored = doability(r, { partial: true });
+
   const body = h(
     'div',
     { class: 'stack' },
@@ -111,6 +204,27 @@ function recDrawer(r) {
     (r.raisedFrom || []).length > 1 ? h('div', {}, h('div', { class: 'tile-label', text: 'Raised from' }), h('ul', { class: 'list-compact small' }, (r.raisedFrom || []).map((x) => { const n = x.nodeId ? nodeById(x.nodeId) : null; return h('li', { text: (n ? 'Node ' + n.nodeNumber : 'Node —') + (x.recId ? ' (' + x.recId + ')' : '') }); }))) : null,
     h('div', { class: 'section-rule' }, h('h2', { text: 'Tracking' })),
     h('div', { class: 'grid c2' }, field('Status', status), field('Priority', priority), field('Hierarchy of control', level), field('Target date', date), field('Responsible department', dept), field('Responsible person', person)),
+    h('div', { class: 'section-rule' }, h('h2', { text: 'How practicable is it' })),
+    h('p', {
+      class: 'card-note',
+      text:
+        'These seven facts decide where this action sits in the priority order and whether it is credited in the before-and-after risk picture. Leave a field undeclared and it stays undeclared — an uncosted action is not a cheap one, so the engine leaves it out of the ranking rather than guessing.',
+    }),
+    scored.ok
+      ? h(
+          'div',
+          { class: 'note plain' },
+          h('strong', { text: 'Doability ' + scored.score + '/100 — ' + scored.bandLabel + '. ' }),
+          scored.bandNote,
+          scored.partial
+            ? h('div', { class: 'small', text: 'Based on ' + scored.coverage + '% of the effort fields. The score will move as the rest are declared.' })
+            : null,
+          scored.drivers.filter((d) => d.direction === 'harder').length
+            ? h('div', { class: 'small', text: 'What makes it hard: ' + scored.drivers.filter((d) => d.direction === 'harder').map((d) => d.label.toLowerCase() + ' — ' + d.option).join('; ') + '.' })
+            : null
+        )
+      : h('div', { class: 'note warn' }, h('strong', { text: 'Not ranked. ' }), scored.message + ' Declare them and this action joins the priority order.'),
+    effortGrid,
     h('div', { class: 'section-rule' }, h('h2', { text: 'Close-out' })),
     h('p', { class: 'card-note', text: 'Closing needs an authorized user, a named verifier and, where the recommendation requires it, evidence. The AI layer has no path to CLOSED at all.' }),
     field('Close-out evidence', h('div', {}, evidenceList.length ? h('ul', { class: 'list-compact small' }, evidenceList.map((e) => h('li', { text: e.title || 'Evidence' }))) : h('p', { class: 'muted small', text: 'No evidence attached.' }), h('button', { class: 'btn sm', text: 'Attach evidence', onclick: () => attachEvidence(r) }))),
@@ -132,10 +246,16 @@ function recDrawer(r) {
             return;
           }
         }
+        const effort = {};
+        for (const f of EFFORT_FIELDS) {
+          const v = effortInputs[f.key].value;
+          if (v) effort[f.key] = v;
+        }
         await S.store.update(
           'recommendations',
           r.id,
           {
+            effort,
             status: status.value,
             priority: priority.value || null,
             controlLevel: level.value || null,

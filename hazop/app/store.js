@@ -33,6 +33,11 @@ export const COLLECTIONS = Object.freeze([
   'legal_node_links',
   'risk_matrices',
   'ai_runs',
+  'chat_actions',
+  'research_queries',
+  'research_findings',
+  'company_profile',
+  'reasoning_runs',
   'report_versions',
   'audit',
 ]);

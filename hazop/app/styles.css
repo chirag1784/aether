@@ -610,10 +610,13 @@ td.nowrap { white-space: nowrap; }
 }
 
 .section-rule {
-  display: flex; align-items: center; gap: 10px; margin: 20px 0 10px;
+  /* Wraps, because a section rule may carry an action button whose label is
+     longer than a phone is wide. Without this the whole page overflows. */
+  display: flex; align-items: center; gap: 10px; margin: 20px 0 10px; flex-wrap: wrap;
 }
-.section-rule h2 { font-size: 13px; margin: 0; font-weight: 600; white-space: nowrap; }
-.section-rule::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.section-rule h2 { font-size: 13px; margin: 0; font-weight: 600; min-width: 0; }
+.section-rule::after { content: ""; flex: 1 1 40px; height: 1px; background: var(--line); }
+.section-rule > .btn { flex: 0 1 auto; min-width: 0; }
 
 .stack { display: flex; flex-direction: column; gap: 10px; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -691,3 +694,86 @@ td.nowrap { white-space: nowrap; }
   .report-section:first-child { break-before: auto; }
   tr { break-inside: avoid; }
 }
+
+/* ------------------------------------------------------------------ tabs */
+/* Views written later use a class rather than aria-selected; both read the
+   same, so the selected tab looks identical wherever it came from. */
+.tab.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+
+.linkish {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--accent); text-decoration: underline; font: inherit;
+}
+.card.compact { padding: 9px 11px; }
+
+/* -------------------------------------------------------------- diagrams */
+/* Diagrams carry no colour of their own: a band is the same colour here, in a
+   badge and in a table cell, so the picture cannot contradict the register. */
+.diagram-wrap { overflow-x: auto; margin: 4px 0; }
+.diagram-wrap.wide { padding-bottom: 4px; }
+/* Scale down to fit a phone, but never up past the size the geometry was laid
+   out for: a risk matrix blown up to fill a 27-inch card is harder to read,
+   not easier. */
+.diagram { display: block; width: 100%; height: auto; max-width: 100%; }
+.matrix-diagram { max-width: 600px; }
+.slope-diagram { max-width: 560px; }
+.diagram-wrap.wide .diagram { min-width: 680px; max-width: 1100px; }
+
+.dg-tick { font-size: 10.5px; fill: var(--ink); font-family: var(--mono); }
+.dg-tick-sub { font-size: 9px; fill: var(--muted); }
+.dg-axis-label { font-size: 10.5px; fill: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.dg-col-label { font-size: 10px; fill: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.dg-delta { font-size: 10px; font-family: var(--mono); fill: var(--muted); }
+.dg-delta.down { fill: var(--ok, var(--accent)); }
+.dg-delta.up { fill: var(--critical); }
+
+.dg-arrow { stroke: var(--ink); stroke-width: 1.3; opacity: 0.55; }
+.dg-mark.pick { cursor: pointer; }
+.dg-mark.pick:hover .dg-dot,
+.dg-mark.pick:focus-visible .dg-dot { stroke-width: 2.6; }
+.dg-mark:focus-visible { outline: none; }
+.dg-mark:focus-visible .dg-dot { stroke: var(--accent); }
+
+.dg-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+.dg-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.dg-swatch { width: 11px; height: 11px; border-radius: 2px; display: inline-block; border: 1px solid var(--bg); }
+.dg-swatch.ring { background: var(--bg); border: 1.6px solid var(--ink); border-radius: 50%; }
+.dg-swatch.dot { background: var(--ink); border-radius: 50%; }
+
+.dg-node-rect { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+.dg-node-line { font-size: 9.5px; fill: var(--ink); }
+.dg-node.event .dg-node-rect { fill: var(--surface-2); stroke: var(--critical); stroke-width: 2; }
+.dg-node.cause .dg-node-rect { stroke: var(--line-strong); }
+.dg-node.consequence .dg-node-rect { stroke: var(--line-strong); }
+.dg-node.barrier .dg-node-rect { fill: var(--surface-2); stroke: var(--accent); stroke-width: 1.6; }
+.dg-node.barrier.uncredited .dg-node-rect { stroke-dasharray: 3 3; stroke: var(--muted); }
+.dg-edge { stroke: var(--line-strong); stroke-width: 1.1; opacity: 0.7; }
+.band-strip { border-radius: 3px; overflow: hidden; }
+
+/* ------------------------------------------------------- assistant panel */
+.chat-autonomy { margin-left: auto; margin-right: 6px; }
+.chat-autonomy select { font-size: 11px; padding: 2px 5px; }
+
+.chat-boundary, .chat-tools, .chat-ledger { font-size: 11.5px; margin: 8px 0; }
+.chat-boundary > summary, .chat-tools > summary, .chat-ledger > summary {
+  cursor: pointer; color: var(--muted); padding: 3px 0;
+}
+.chat-boundary p, .chat-boundary ul { margin: 5px 0; }
+.tool-row { display: flex; gap: 7px; align-items: center; padding: 2px 0; }
+.ledger-row { padding: 5px 0; border-top: 1px solid var(--line); }
+
+.chat-passes { margin: 10px 0; }
+.chat-passes-label {
+  font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 5px;
+}
+.chat-pass {
+  display: block; width: 100%; text-align: left; margin-bottom: 4px;
+  padding: 6px 9px; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px;
+}
+.chat-pass:hover { border-color: var(--accent); background: var(--surface-2); }
+
+.pass-card { margin: 8px 0; }
+.pass-finding { padding: 7px 0; border-top: 1px solid var(--line); }
+.pending-card { margin: 8px 0; border-left: 3px solid var(--ochre, var(--accent)); }

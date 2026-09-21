@@ -42,7 +42,7 @@ export async function seedDemoProject(baseStore, onProgress) {
 }
 
 // Kept roughly in step with the seed below; used only for the progress line.
-const TOTAL_RECORDS = 160;
+const TOTAL_RECORDS = 172;
 
 async function build(store, onProgress) {
   const ref = (quote, page) => [{ sourceType: 'PROJECT_DOCUMENT', documentName: DOC_TITLE, page: page || null, quote: quote || null, extractedAt: nowIso() }];
@@ -178,13 +178,43 @@ async function build(store, onProgress) {
   const product = await store.create('chemicals', { projectId: pid, canonicalName: 'Calcium stearate', synonyms: ['Octadecanoic acid, calcium salt'], cas: '1592-23-0', casValid: true, quantity: null, quantityUnit: 'kg', quantityStatus: 'MISSING', physicalState: 'Solid (granules)', identityStatus: 'DOCUMENT_EXTRACTED', hazardousClassification: null, sourceRefs: ref('mass converted into product in granule form', 12) }, P);
 
   // Properties: only what the study itself supports, with honest statuses.
-  await store.create('chem_properties', { projectId: pid, chemicalId: stearic.id, group: 'physical', key: 'meltingPoint', value: null, unit: 'degC', status: 'MISSING' }, P);
-  await store.create('chem_properties', { projectId: pid, chemicalId: stearic.id, group: 'fire', key: 'flashPoint', value: null, unit: 'degC', status: 'MISSING' }, P);
+  // Researched values, kept as WEB_SOURCED with the document they came from.
+  // WEB_SOURCED is not VERIFIED: nobody on this project has yet opened the
+  // primary document and signed for the figure, and the difference is the
+  // point. The engines will use a sourced value; the report will still say it
+  // was researched rather than confirmed.
+  const webRef = (label, url, evidence) => ({
+    status: 'WEB_SOURCED',
+    sourceKind: evidence,
+    sourceClass: evidence === 'SUPPLIER_SDS' ? 'SUPPLIER_SDS' : evidence === 'PRIMARY_REGULATOR' ? 'REGULATOR_DB' : 'SCIENTIFIC_DB',
+    sourceUrl: url,
+    retrievedAt: '2026-09-21T00:00:00.000Z',
+    sourceRefs: [
+      {
+        sourceType: evidence === 'SUPPLIER_SDS' ? 'SDS' : 'SCIENTIFIC_SOURCE',
+        sourceClass: evidence === 'SUPPLIER_SDS' ? 'SUPPLIER_SDS' : evidence === 'PRIMARY_REGULATOR' ? 'REGULATOR_DB' : 'SCIENTIFIC_DB',
+        sourceLabel: evidence,
+        documentName: label,
+        url,
+        retrievedAt: '2026-09-21T00:00:00.000Z',
+      },
+    ],
+    researchNote: 'Researched from a public source, not read from the supplier SDS for the grade this plant actually buys. Confirm before it is used as a design basis.',
+  });
+
+  await store.create('chem_properties', Object.assign({ projectId: pid, chemicalId: stearic.id, group: 'physical', key: 'meltingPoint', property: 'meltingPoint', value: '67', valueLow: '67', valueHigh: '72', valueAsWritten: '67–72 °C', unit: 'degC' }, webRef('Stearic acid MSDS (ChemicalBook)', 'https://www.chemicalbook.com/msds/stearic-acid.pdf', 'AUTHORITATIVE_DATABASE')), P);
+  await store.create('chem_properties', Object.assign({ projectId: pid, chemicalId: stearic.id, group: 'fire', key: 'flashPoint', property: 'flashPoint', value: '205', valueAsWritten: '205 °C', unit: 'degC' }, webRef('Stearic acid MSDS, CAS 57-11-4 (CDH Fine Chemical)', 'https://www.cdhfinechemical.com/images/product/msds/4_720193780_StearicAcid-CASNO-57-11-4-MSDS.pdf', 'MANUFACTURER_SDS')), P);
+  await store.create('chem_properties', Object.assign({ projectId: pid, chemicalId: stearic.id, group: 'fire', key: 'autoignitionTemperature', property: 'autoignitionTemperature', value: '395', valueAsWritten: '395 °C', unit: 'degC' }, webRef('Stearic acid safety data sheet (Fisher Scientific)', 'https://fscimage.fishersci.com/msds/95204.htm', 'MANUFACTURER_SDS')), P);
+  await store.create('chem_properties', Object.assign({ projectId: pid, chemicalId: product.id, group: 'fire', key: 'autoignitionTemperature', property: 'autoignitionTemperature', value: '250', valueAsWritten: '250 °C', unit: 'degC' }, webRef('Calcium stearate SDS (Sigma-Aldrich 26411)', 'https://www.sigmaaldrich.com/US/en/product/sial/26411', 'MANUFACTURER_SDS')), P);
+  await store.create('chem_properties', Object.assign({ projectId: pid, chemicalId: lime.id, group: 'physical', key: 'ph', property: 'ph', value: '12.4', valueAsWritten: 'pH 12.4 at 20 °C', condition: '20 °C' }, webRef('Calcium hydroxide, CAS 1305-62-0 (ChemicalBook)', 'https://www.chemicalbook.com/ChemicalProductProperty_EN_CB9853016.htm', 'AUTHORITATIVE_DATABASE')), P);
+  await store.create('chem_properties', Object.assign({ projectId: pid, chemicalId: lime.id, group: 'tox', key: 'twa', property: 'twa', value: '5', valueAsWritten: 'TLV 5 mg/m³', unit: 'mg/m3' }, webRef('Calcium hydroxide hazard fact sheet (New Jersey Department of Health)', 'https://nj.gov/health/eoh/rtkweb/documents/fs/0322.pdf', 'PRIMARY_REGULATOR')), P);
   await store.create('chem_properties', { projectId: pid, chemicalId: stearic.id, group: 'dust', key: 'combustibleDust', value: true, status: 'AI_INFERRED', sourceClass: 'OTHER_TECHNICAL', sourceRefs: [{ sourceType: 'AI_INFERENCE', documentName: 'Inferred from the study\'s own fire and dusting findings during charging', extractedAt: nowIso() }] }, P);
   await store.create('chem_properties', { projectId: pid, chemicalId: product.id, group: 'dust', key: 'combustibleDust', value: null, status: 'MISSING' }, P);
   await store.create('chem_properties', { projectId: pid, chemicalId: lime.id, group: 'tox', key: 'acuteToxicity', value: 'Causes serious eye damage and skin irritation (per the study\'s health-impact findings; confirm against the supplier SDS)', status: 'AI_INFERRED', sourceClass: 'OTHER_TECHNICAL' }, P);
   await store.create('chem_properties', { projectId: pid, chemicalId: lime.id, group: 'reactivity', key: 'waterReactive', value: null, status: 'MISSING' }, P);
 
+  await store.create('data_gaps', { projectId: pid, entityKind: 'chemical', entityId: product.id, field: 'kst', label: 'Calcium stearate dust explosion constants (Kst, Pmax, MIE)', blocks: ['CHEMICAL_ALERTS', 'DUST_EXPLOSION_ASSESSMENT'], resolveWith: ['GESTIS-DUST-EX database', 'Supplier SDS for the grade purchased', 'A tested sample from this plant'], detail: 'Public sources confirm calcium stearate is a combustible dust and give an autoignition temperature, but none of them carries Kst, Pmax or the minimum ignition energy. Those constants depend on the particle size this plant actually produces after grinding at 250 kg/h, so a generic figure would not be usable even if one were found. Until they are recorded the dust-explosion severity cannot be assessed and the grinding and packing node cannot be closed out.', status: 'OPEN' }, P);
+  await store.create('data_gaps', { projectId: pid, entityKind: 'chemical', entityId: stearic.id, field: 'grade', label: 'Stearic acid grade and particle size as purchased', blocks: ['CHEMICAL_ALERTS'], resolveWith: ['Purchase specification', 'Supplier SDS'], detail: 'The flash point and melting range recorded here come from public sources for stearic acid generally. Both vary with the commercial grade, and the melting range decides whether the 90 °C step is above or below the melt. Record the grade so the researched figures can be checked against the right document.', status: 'OPEN' }, P);
   await store.create('data_gaps', { projectId: pid, entityKind: 'chemical', entityId: catalyst.id, field: 'identity', label: 'Catalyst identity', blocks: ['LEGAL_THRESHOLD', 'CHEMICAL_ALERTS', 'SDS_COMPLETENESS'], resolveWith: ['SDS', 'PROJECT_DOCUMENT'], detail: 'The source study charges 10 kg of "catalyst" without naming it. Until the material is identified no property can be attached, no compatibility check can run, and no threshold comparison is possible.', status: 'OPEN' }, P);
 
   // ------------------------------------------------------------ process steps
@@ -305,9 +335,10 @@ async function build(store, onProgress) {
       consequences: [['Process delayed', 'PROCESS_DELAY'], ['Quality impact', 'OFF_SPEC'], ['Dust exposure to the operator', 'EXPOSURE'], ['Fire', 'FLASH_FIRE']],
       safeguards: [['Quality and quantity verification system of doer and checker', 'ADMINISTRATIVE'], ['BMR control', 'ADMINISTRATIVE'], ['Trained operator', 'ADMINISTRATIVE'], ['Fire extinguishers', 'MITIGATION'], ['Earthing', 'MITIGATION']],
       recs: [
-        ['Ensure preventive maintenance and calibration of the weighing balance at the defined frequency.', 'ADMINISTRATIVE', 'MEDIUM', 'Maintenance'],
-        ['Ensure adequate PPE is available and used for the charging operation.', 'PPE', 'MEDIUM', 'EHS'],
+        ['Ensure preventive maintenance and calibration of the weighing balance at the defined frequency.', 'ADMINISTRATIVE', 'MEDIUM', 'Maintenance', { costBand: 'A', leadTime: 'WEEKS', outage: 'NONE', engineering: 'NONE', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Ensure adequate PPE is available and used for the charging operation.', 'PPE', 'MEDIUM', 'EHS', { costBand: 'A', leadTime: 'DAYS', outage: 'NONE', engineering: 'NONE', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
       ],
+      rate: { l: 3, s: 3 },
     },
     {
       parameter: 'quantity', parameterLabel: 'Quantity', guideword: 'LESS', guidewordLabel: 'LESS', deviation: 'LESS quantity',
@@ -324,11 +355,17 @@ async function build(store, onProgress) {
       consequences: [['Fire hazard', 'FLASH_FIRE'], ['Dusting', 'EXPOSURE']],
       safeguards: [['Static grounding, rod and clamp', 'MITIGATION'], ['Fire extinguisher provided', 'MITIGATION'], ['Fire-proof fittings', 'PREVENTION'], ['Earthing and bonding provided to the plough shear mixer', 'MITIGATION']],
       recs: [
-        ['Ensure monitoring of grounding resistance at every six months, covering the mixer, the charging drums, the hoses and the operator.', 'ENGINEERING', 'HIGH', 'Electrical'],
-        ['Ensure adequate PPE for the charging operation.', 'PPE', 'MEDIUM', 'EHS'],
-        ['Provide a dust collector system at the charging point.', 'ENGINEERING', 'HIGH', 'Project'],
+        ['Ensure monitoring of grounding resistance at every six months, covering the mixer, the charging drums, the hoses and the operator.', 'ENGINEERING', 'HIGH', 'Electrical', { costBand: 'A', leadTime: 'DAYS', outage: 'NONE', engineering: 'NONE', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Ensure adequate PPE for the charging operation.', 'PPE', 'MEDIUM', 'EHS', { costBand: 'A', leadTime: 'WEEKS', outage: 'NONE', engineering: 'NONE', competency: 'LOCAL_VENDOR', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Provide a dust collector system at the charging point.', 'ENGINEERING', 'HIGH', 'Project', { costBand: 'C', leadTime: 'MONTHS', outage: 'PLANNED_SHUTDOWN', engineering: 'MODIFICATION', competency: 'LOCAL_VENDOR', approval: 'NONE', spaceAccess: 'TIGHT' }],
       ],
       rate: { l: 3, s: 4 },
+      residual: {
+        l: 1,
+        s: 4,
+        kind: 'ENGINEERING_CONTROL',
+        text: 'Grounding resistance monitored on a six-monthly interval across the mixer, the drums, the hoses and the operator, plus local dust extraction at the charging point, removes the accumulation mechanism rather than the exposure. Severity is unchanged: a flash fire in the charging bay has the same consequence whether or not the charge that started it was controlled.',
+      },
     },
     {
       parameter: 'heating', parameterLabel: 'Heating', guideword: 'NO', guidewordLabel: 'NO / NOT', deviation: 'NO heating',
@@ -344,8 +381,17 @@ async function build(store, onProgress) {
       causes: [['TFH valve malfunction', 'VALVE_FAILURE'], ['TFH line leakage', 'LEAKAGE'], ['TG malfunction', 'INSTRUMENT_FAILURE'], ['Human error', 'HUMAN_ERROR']],
       consequences: [['Process delay', 'PROCESS_DELAY'], ['Flash fire', 'FLASH_FIRE']],
       safeguards: [['Trained operator', 'ADMINISTRATIVE'], ['Supervision', 'ADMINISTRATIVE'], ['BMR control', 'ADMINISTRATIVE'], ['Fire extinguishers', 'MITIGATION'], ['Temperature controller', 'CONTROL']],
-      recs: [['Ensure preventive maintenance of the valve and calibration of the temperature gauge and the temperature controller.', 'ADMINISTRATIVE', 'HIGH', 'Instrumentation']],
+      recs: [
+        ['Ensure preventive maintenance of the valve and calibration of the temperature gauge and the temperature controller.', 'ADMINISTRATIVE', 'HIGH', 'Instrumentation', { costBand: 'A', leadTime: 'WEEKS', outage: 'NONE', engineering: 'NONE', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Provide an independent high-temperature trip on the plough shear mixer, set above the 90 °C operating point and below the stearic acid flash point, acting to close the thermic-fluid valve.', 'ENGINEERING', 'HIGH', 'Instrumentation', { costBand: 'B', leadTime: 'MONTHS', outage: 'PLANNED_SHUTDOWN', engineering: 'MODIFICATION', competency: 'LOCAL_VENDOR', approval: 'NONE', spaceAccess: 'YES' }],
+      ],
       rate: { l: 3, s: 4 },
+      residual: {
+        l: 1,
+        s: 4,
+        kind: 'INSTRUMENTED_FUNCTION',
+        text: 'An independent high-temperature trip closing the thermic-fluid valve removes the single-point dependence on the temperature controller and the operator, so the overheat is arrested rather than noticed. The trip setting has to sit below the stearic acid flash point, which is itself an open data gap, so this basis is provisional until that figure is sourced.',
+      },
     },
     {
       parameter: 'agitation', parameterLabel: 'Agitation', guideword: 'NO', guidewordLabel: 'NO / NOT', deviation: 'NO agitation',
@@ -354,10 +400,15 @@ async function build(store, onProgress) {
       consequences: [['Improper or no reaction', 'OFF_SPEC']],
       safeguards: [['Supervision', 'ADMINISTRATIVE'], ['BMR control', 'ADMINISTRATIVE'], ['DG set', 'MITIGATION']],
       recs: [
-        ['Strict adherence to the BMR for the agitation step.', 'ADMINISTRATIVE', 'MEDIUM', 'Production'],
-        ['Ensure preventive maintenance of the stirrer assembly, including the gearbox and the coupling.', 'ADMINISTRATIVE', 'MEDIUM', 'Maintenance'],
-        ['Provide a stirrer failure alarm on the plough shear mixer.', 'ENGINEERING', 'HIGH', 'Instrumentation'],
+        ['Strict adherence to the BMR for the agitation step.', 'ADMINISTRATIVE', 'MEDIUM', 'Production', { costBand: 'A', leadTime: 'DAYS', outage: 'NONE', engineering: 'NONE', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Ensure preventive maintenance of the stirrer assembly, including the gearbox and the coupling.', 'ADMINISTRATIVE', 'MEDIUM', 'Maintenance', { costBand: 'B', leadTime: 'WEEKS', outage: 'PLANNED_SHUTDOWN', engineering: 'MINOR', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Provide a stirrer failure alarm on the plough shear mixer.', 'ENGINEERING', 'HIGH', 'Instrumentation', { costBand: 'B', leadTime: 'WEEKS', outage: 'NONE', engineering: 'MINOR', competency: 'LOCAL_VENDOR', approval: 'NONE', spaceAccess: 'YES' }],
       ],
+      // Rated but deliberately left without a residual: the before-and-after
+      // picture then shows a row that is being worked on and still does not
+      // move, which is the gap a reviewer needs to see rather than a tidy
+      // chart that implies the work is already banked.
+      rate: { l: 4, s: 2 },
     },
     {
       parameter: 'time', parameterLabel: 'Time', guideword: 'LESS', guidewordLabel: 'LESS', deviation: 'LESS time',
@@ -374,10 +425,17 @@ async function build(store, onProgress) {
       consequences: [['Operator exposure to hot mass and dust', 'EXPOSURE'], ['Spillage', 'WATER_SOIL']],
       safeguards: [['Supervision', 'ADMINISTRATIVE'], ['Sampling from the top', 'PREVENTION'], ['SOP for sampling', 'ADMINISTRATIVE']],
       recs: [
-        ['Ensure proper ventilation at the sampling point.', 'ENGINEERING', 'MEDIUM', 'Project'],
-        ['Ensure a spill kit is provided in the nearby area.', 'ADMINISTRATIVE', 'MEDIUM', 'EHS'],
-        ['Include safety precautions for sampling in the sampling guideline.', 'ADMINISTRATIVE', 'MEDIUM', 'EHS'],
+        ['Ensure proper ventilation at the sampling point.', 'ENGINEERING', 'MEDIUM', 'Project', { costBand: 'B', leadTime: 'WEEKS', outage: 'NONE', engineering: 'MINOR', competency: 'LOCAL_VENDOR', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Ensure a spill kit is provided in the nearby area.', 'ADMINISTRATIVE', 'MEDIUM', 'EHS', { costBand: 'A', leadTime: 'DAYS', outage: 'NONE', engineering: 'NONE', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
+        ['Include safety precautions for sampling in the sampling guideline.', 'ADMINISTRATIVE', 'MEDIUM', 'EHS', { costBand: 'A', leadTime: 'WEEKS', outage: 'NONE', engineering: 'NONE', competency: 'IN_HOUSE', approval: 'NONE', spaceAccess: 'YES' }],
       ],
+      rate: { l: 4, s: 3 },
+      residual: {
+        l: 2,
+        s: 3,
+        kind: 'ENGINEERING_CONTROL',
+        text: 'Local extraction at the sampling point removes the operator from the dust and vapour path at the moment of exposure, rather than relying on the SOP being followed under a hot, awkward manual operation. Severity is unchanged because the material and its temperature are unchanged.',
+      },
     },
     {
       parameter: 'transfer', parameterLabel: 'Transfer', guideword: 'NO', guidewordLabel: 'NO / NOT', deviation: 'NO transfer',
@@ -444,6 +502,7 @@ async function build(store, onProgress) {
       causes: [['Sieve partially choked', 'BLOCKAGE'], ['Sieve damage', 'BLOCKAGE'], ['Human error', 'HUMAN_ERROR']],
       consequences: [['Process delay', 'PROCESS_DELAY'], ['Quality impact', 'OFF_SPEC'], ['Static charge generation in the powder', 'EXPOSURE']],
       safeguards: [['Trained operator', 'ADMINISTRATIVE'], ['Supervisor', 'ADMINISTRATIVE'], ['Earthing and bonding', 'MITIGATION']],
+      rate: { l: 3, s: 2 },
       recs: [],
     },
     {
@@ -452,6 +511,10 @@ async function build(store, onProgress) {
       causes: [['Powder handling and free fall at the packing station', 'STATIC'], ['Loss of earthing continuity', 'STATIC']],
       consequences: [['Dust fire', 'DUST_FIRE'], ['Operator exposure to dust', 'EXPOSURE']],
       safeguards: [['Earthing and bonding at the vibro shifter', 'MITIGATION']],
+      // Rated and carrying no recommendation at all: the row the
+      // before-and-after picture shows sitting exactly where it started,
+      // which is the point of drawing the picture.
+      rate: { l: 3, s: 4 },
       recs: [],
     },
   ];
@@ -478,13 +541,18 @@ async function build(store, onProgress) {
         initialSeverity: r.rate ? r.rate.s : null,
         initialRisk: null,
         riskBasis: r.rate ? 'Illustrative rating seeded with the worked example; not the source study\'s rating.' : null,
-        residualLikelihood: null,
-        residualSeverity: null,
+        // A residual rating is seeded only where the worked example carries a
+        // stated basis for the reduction, because that is the rule the
+        // validator enforces on a real edit.
+        residualLikelihood: r.residual ? r.residual.l : null,
+        residualSeverity: r.residual ? r.residual.s : null,
+        residualBasisKind: r.residual ? r.residual.kind : null,
+        residualBasisText: r.residual ? r.residual.text : null,
         reviewerStatus: 'TEAM_REVIEWED',
         evidenceRefs: ref('Source worksheet row: ' + (r.detail || r.deviation), 12),
       }, P);
 
-      for (const [text, controlLevel, priority, dept] of r.recs || []) {
+      for (const [text, controlLevel, priority, dept, effort] of r.recs || []) {
         recNo += 1;
         await store.create('recommendations', {
           projectId: pid,
@@ -495,6 +563,10 @@ async function build(store, onProgress) {
           technicalBasis: 'Raised by the HAZOP team against ' + r.deviation.toLowerCase() + (r.detail ? ' (' + r.detail + ')' : '') + '.',
           controlLevel,
           priority,
+          // Declared effort, where the worked example can justify it from the
+          // study itself. Left undeclared elsewhere, which is what keeps those
+          // actions out of the ranking instead of assuming they are cheap.
+          effort: effort || {},
           responsibleDepartment: dept,
           responsiblePerson: '',
           targetDate: null,

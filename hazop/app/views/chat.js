@@ -1,24 +1,34 @@
-// app/views/chat.js — the persistent AI panel.
+// app/views/chat.js — the assistant panel.
 //
-// The chat may read project state and PROPOSE actions. It never mutates
-// anything directly: a proposed action is rendered as a confirmation card and
-// runs through the same validators as a human edit.
+// The assistant has authority over the application. It reads every collection
+// and every engine result through the tools in `ai-tools.js`, and it writes
+// records the same way a human does. Two things shape how that feels:
+//
+//  * Autonomy is the user's setting. "Ask first" turns every write into a card
+//    they confirm; "Act and report" applies it and shows an Undo. The
+//    assistant cannot change the setting.
+//  * It reasons before it writes. The HAZOP passes below run on the strong
+//    tier with a stated method, because "find the deviations this study
+//    missed" is not a lookup.
+//
+// The tools do the calculating. The assistant is never asked to multiply a
+// likelihood by a severity — `get_risk` answers that, and the panel says so.
 
-import { h, clear, toast, truncate, nowIso, uid } from '../util.js';
-import { S, render, project, scoped, nodesSorted, matrix, complianceRegister, complianceCounts, applicability, qualityGate, alerts, recommendationRegister, completeness, permitStatuses, chemicalsResolved, thresholdSets, go } from '../state.js';
-import { aiAvailable, getAdapter, buildContext } from '../ai.js';
-import { riskFromLS } from '../../packages/calculations/risk.js';
-import { generateDeviations } from '../../packages/domain/guidewords.js';
+import { h, clear, toast, truncate, nowIso, uid, dtFmt, sectionRule, select } from '../util.js';
+import { S, render, project, scoped, go } from '../state.js';
+import { aiAvailable, getAdapter } from '../ai.js';
+import { instrumentedTools, pending, applyWrite, clearPending, undoAction, AUTONOMY, HUMAN_ONLY } from '../ai-tools.js';
+import { REASONING_PASSES, runPass } from '../reason.js';
 
 const SUGGESTIONS = [
-  'Which laws may apply to this reactor node, and why?',
-  'Why did you flag MSIHC for this project?',
-  'Show me the threshold calculation.',
-  'What compliance evidence is missing?',
-  'Show upcoming renewals.',
-  'Which worksheet rows are high risk with no action?',
+  'What has this study missed?',
+  'Which rows are high risk with nothing done about them?',
+  'What should we actually do first?',
+  'Challenge the safeguards on node 01.',
   'What is blocking the report?',
-  'Which cause families has node 01 not considered?',
+  'Which laws may apply, and what is still unresolved?',
+  'Find the common causes across the worksheet.',
+  'What data is missing and where do I get it?',
 ];
 
 let controller = null;
@@ -29,7 +39,10 @@ export function renderChat() {
     'div',
     { class: 'chat-head' },
     h('h2', { text: 'Assistant' }),
-    S.chatBusy ? h('button', { class: 'btn sm ghost', text: 'Stop', onclick: () => { if (controller) controller.abort(); } }) : null,
+    autonomyChip(),
+    S.chatBusy
+      ? h('button', { class: 'btn sm ghost', text: 'Stop', onclick: () => { if (controller) controller.abort(); } })
+      : null,
     S.chat.length ? h('button', { class: 'btn sm ghost', text: 'Clear', onclick: () => { S.chat = []; render(); } }) : null,
     h('button', { class: 'btn ghost icon', 'aria-label': 'Close the assistant', text: '✕', onclick: () => { S.chatOpen = false; render(); } })
   );
@@ -38,24 +51,71 @@ export function renderChat() {
 
   if (!aiAvailable()) {
     log.appendChild(
-      h('div', { class: 'note plain small' }, h('strong', { text: 'The assistant is not available in this view. ' }), 'Every deterministic part of the app still works. When it is available it runs on your own Claude account, and it can read this project\'s data to answer questions — it cannot change anything without your confirmation.')
+      h(
+        'div',
+        { class: 'note plain small' },
+        h('strong', { text: 'The assistant is not available in this view. ' }),
+        'Every deterministic part of the app still works — the engines, the registers, the exports. When it is available it runs on your own Claude account and has authority over the project: it reads everything and it writes records, with your chosen level of confirmation.'
+      )
     );
   } else if (!S.chat.length) {
-    log.appendChild(h('div', { class: 'msg system' }, h('div', { class: 'msg-body', text: 'Ask about this project. The assistant reads the project record and the app\'s own findings; it does not compute risk scores or threshold crossings, and it cannot change project data without your confirmation.' })));
+    log.appendChild(
+      h(
+        'div',
+        { class: 'msg system' },
+        h('div', {
+          class: 'msg-body',
+          text:
+            'Ask about this project, or tell me to change it. I read the worksheet, the chemicals, the compliance register and every engine result through the app\'s own tools, and I write records the same way you do — audited, attributed and reversible. I do not calculate: risk scores, unit conversions and threshold comparisons come back from the engines and I quote them.',
+        })
+      )
+    );
     log.appendChild(h('div', { class: 'chat-suggest' }, SUGGESTIONS.map((s) => h('button', { text: s, onclick: () => send(s) }))));
+    log.appendChild(passStrip());
+    log.appendChild(boundaryNote());
   }
 
   for (const m of S.chat) {
-    if (m.role === 'action') {
-      log.appendChild(actionCard(m));
+    if (m.role === 'tool') {
+      log.appendChild(toolTrace(m));
       continue;
     }
-    log.appendChild(h('div', { class: 'msg ' + m.role }, h('div', { class: 'msg-role', text: m.role === 'user' ? 'You' : m.role === 'ai' ? 'Assistant' : 'Note' }), h('div', { class: 'msg-body', text: m.text })));
+    if (m.role === 'pass') {
+      log.appendChild(passCard(m));
+      continue;
+    }
+    log.appendChild(
+      h(
+        'div',
+        { class: 'msg ' + m.role },
+        h('div', { class: 'msg-role', text: m.role === 'user' ? 'You' : m.role === 'ai' ? 'Assistant' : 'Note' }),
+        h('div', { class: 'msg-body', text: m.text })
+      )
+    );
   }
 
-  if (S.chatBusy) log.appendChild(h('div', { class: 'msg ai' }, h('div', { class: 'msg-role', text: 'Assistant' }), h('div', { class: 'msg-body' }, h('span', { class: 'spin' }), h('span', { text: ' Thinking…' }))));
+  for (const q of pending) log.appendChild(pendingCard(q));
 
-  const box = h('textarea', { id: 'chat-input', placeholder: aiAvailable() ? 'Ask about this project…' : 'Unavailable in this view', rows: 2, disabled: !aiAvailable() });
+  if (S.chatBusy) {
+    log.appendChild(
+      h(
+        'div',
+        { class: 'msg ai' },
+        h('div', { class: 'msg-role', text: 'Assistant' }),
+        h('div', { class: 'msg-body' }, h('span', { class: 'spin' }), h('span', { text: ' ' + (S.chatStage || 'Thinking…') }))
+      )
+    );
+  }
+
+  const ledgerRows = scoped('chat_actions').slice().sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  if (ledgerRows.length && S.chat.length) log.appendChild(ledgerPanel(ledgerRows));
+
+  const box = h('textarea', {
+    id: 'chat-input',
+    placeholder: aiAvailable() ? 'Ask, or tell me to change something…' : 'Unavailable in this view',
+    rows: 2,
+    disabled: !aiAvailable(),
+  });
   box.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -70,7 +130,22 @@ export function renderChat() {
     'div',
     { class: 'chat-foot' },
     box,
-    h('div', { class: 'between', style: { 'margin-top': '6px' } }, h('span', { class: 'muted small', text: 'Cmd/Ctrl + Enter to send' }), h('button', { class: 'btn sm primary', text: 'Send', disabled: !aiAvailable() || S.chatBusy, onclick: () => { const v = box.value.trim(); if (!v) return; box.value = ''; send(v); } }))
+    h(
+      'div',
+      { class: 'between', style: { 'margin-top': '6px' } },
+      h('span', { class: 'muted small', text: 'Cmd/Ctrl + Enter to send' }),
+      h('button', {
+        class: 'btn sm primary',
+        text: 'Send',
+        disabled: !aiAvailable() || S.chatBusy,
+        onclick: () => {
+          const v = box.value.trim();
+          if (!v) return;
+          box.value = '';
+          send(v);
+        },
+      })
+    )
   );
 
   panel.appendChild(head);
@@ -83,195 +158,390 @@ export function renderChat() {
   return panel;
 }
 
-function actionCard(m) {
-  const a = m.action;
+// ---------------------------------------------------------------------------
+// Authority, on screen
+// ---------------------------------------------------------------------------
+
+function autonomyChip() {
+  const cur = AUTONOMY.find((a) => a.key === (S.chatAutonomy || 'ASK')) || AUTONOMY[0];
+  const sel = select(AUTONOMY.map((a) => ({ value: a.key, label: a.label })), cur.key, { id: 'chat-autonomy', title: cur.note });
+  sel.addEventListener('change', () => {
+    S.chatAutonomy = sel.value;
+    toast((AUTONOMY.find((a) => a.key === sel.value) || {}).note || '', 'ok');
+    render();
+  });
+  return h('div', { class: 'chat-autonomy', title: cur.note }, sel);
+}
+
+function boundaryNote() {
   return h(
-    'div',
-    { class: 'card', style: { padding: '10px' } },
-    h('div', { class: 'row', style: { gap: '6px', 'margin-bottom': '5px' } }, h('span', { class: 'badge inferred', text: 'PROPOSED ACTION' }), h('span', { class: 'tag', text: a.kind })),
-    h('div', { style: { 'font-size': '12.5px' }, text: a.summary }),
-    m.applied ? h('div', { class: 'badge verified', style: { 'margin-top': '6px' }, text: 'APPLIED' }) : m.declined ? h('div', { class: 'badge na', style: { 'margin-top': '6px' }, text: 'DECLINED' }) : h('div', { class: 'btn-row', style: { 'margin-top': '7px' } }, h('button', { class: 'btn sm primary', text: 'Apply', onclick: () => applyAction(m) }), h('button', { class: 'btn sm ghost', text: 'Decline', onclick: () => { m.declined = true; render(); } }))
+    'details',
+    { class: 'chat-boundary' },
+    h('summary', { text: 'What the assistant may and may not do' }),
+    h('p', {
+      class: 'small',
+      text:
+        'It may create, change and delete records in every collection the app tracks, set effort fields, rate residual risk through the same validator your edits pass, raise data gaps and recommendations, and move you around the app. Every change is audited and carries an Undo.',
+    }),
+    h('p', { class: 'small', text: 'Five acts it will refuse, because each one is a signature rather than a capability:' }),
+    h('ul', { class: 'small', style: { margin: '0 0 0 16px' } }, HUMAN_ONLY.map((x) => h('li', { text: x.act + ' — ' + x.who + '.' }))),
+    h('p', {
+      class: 'small',
+      text:
+        'It also calculates nothing. Ask it for a risk band and it asks the engine; ask it for a threshold comparison and it quotes the arithmetic the app has already shown.',
+    })
   );
 }
 
-/**
- * Standing instructions. Kept as a leading user turn that is never dropped.
- */
-function instructions() {
-  return [
-    'You are the assistant inside HAZOP MASTER AI, a process-safety platform. You are talking to a process-safety engineer or HAZOP facilitator.',
-    '',
-    'RULES YOU MUST FOLLOW:',
-    '1. Answer from the PROJECT STATE below and nothing else. If the answer is not there, say what is missing and where in the app to record it.',
-    '2. Never state a process condition, capacity, design pressure or temperature, interlock, chemical property, SDS value, legal threshold or statutory obligation that is not in the state.',
-    '3. Never compute or assert a risk score, a threshold crossing, a unit conversion or a renewal date. The application computes these; quote the figures it has already computed and say they are the application\'s.',
-    '4. Never say the facility is compliant, or that an obligation definitely applies. Those are the application\'s statuses and a reviewer\'s decision.',
-    '5. For every legal answer, say clearly which of three things each part is: a source fact, the application\'s own analysis, or an unresolved question.',
-    '6. Be concise and specific. Use the plant\'s own terms — node numbers, equipment tags, guidewords. Plain text, short paragraphs, no markdown headings.',
-    '7. You may propose an action for the user to confirm. To do so, end your reply with a line starting ACTION: followed by one JSON object of the form {"kind":"add_assumption"|"add_data_gap"|"add_recommendation"|"add_team_member"|"add_scenario_note", "summary":"one line for the user", "payload":{...}}. Propose at most one. Never claim to have made a change.',
-  ].join('\n');
+// ---------------------------------------------------------------------------
+// Reasoning passes
+// ---------------------------------------------------------------------------
+
+function passStrip() {
+  const wrap = h('div', { class: 'chat-passes' });
+  wrap.appendChild(h('div', { class: 'chat-passes-label', text: 'Reasoning passes' }));
+  for (const p of REASONING_PASSES) {
+    wrap.appendChild(
+      h('button', {
+        class: 'chat-pass',
+        title: p.method,
+        text: p.label,
+        onclick: () => startPass(p.key),
+      })
+    );
+  }
+  wrap.appendChild(
+    h('p', {
+      class: 'muted small',
+      text: 'Each pass states its method, runs on the strong tier, and returns findings you accept one at a time. A pass never writes on its own.',
+    })
+  );
+  return wrap;
 }
 
-function projectState() {
-  const p = project();
-  if (!p) return { note: 'No project is open.' };
-  const m = matrix();
-  const cc = complianceCounts();
-  const gate = qualityGate();
-  const reg = recommendationRegister();
-  const comp = completeness();
-  const al = alerts();
-  const run = applicability();
+function passCard(m) {
+  const p = REASONING_PASSES.find((x) => x.key === m.pass) || { label: m.pass, method: '' };
+  const card = h('div', { class: 'card pass-card' });
+  card.appendChild(
+    h(
+      'div',
+      { class: 'between' },
+      h('div', {}, h('div', { class: 'eyebrow', text: 'Reasoning pass' }), h('h3', { class: 'card-title', text: p.label })),
+      m.error ? h('span', { class: 'badge missing', text: 'FAILED' }) : h('span', { class: 'badge inferred', text: 'FOR REVIEW' })
+    )
+  );
+  card.appendChild(h('p', { class: 'card-note', text: p.method }));
 
-  const nodes = nodesSorted().map((n) => {
-    const rows = scoped('scenarios').filter((s) => s.nodeId === n.id);
-    const gen = generateDeviations(n, { equipment: scoped('equipment'), chemicals: chemicalsResolved(), chemProperties: scoped('chem_properties') });
-    return {
-      number: n.nodeNumber,
-      name: n.worksheetName,
-      designIntent: truncate(n.designIntent || '', 300),
-      status: n.reviewStatus,
-      equipment: (n.equipmentIds || []).map((id) => (scoped('equipment').filter((e) => e.id === id)[0] || {}).tag).filter(Boolean),
-      chemicals: (n.chemicalIds || []).map((id) => (scoped('chemicals').filter((c) => c.id === id)[0] || {}).canonicalName).filter(Boolean),
-      utilities: n.utilities,
-      operatingTemperature: n.operatingTemperature,
-      rowCount: rows.length,
-      meaningfulDeviations: gen.combinations.length,
-      uncoveredDeviations: gen.combinations.filter((c) => !rows.some((s) => s.parameter === c.parameter && s.guideword === c.guideword)).map((c) => c.deviation).slice(0, 12),
-      rows: rows.slice(0, 22).map((s) => {
-        let risk = null;
-        try {
-          risk = riskFromLS(m, s.initialLikelihood, s.initialSeverity);
-        } catch (e) {
-          risk = null;
-        }
-        return {
-          row: s.rowNumber,
-          deviation: s.deviation,
-          causes: (s.causes || []).map((c) => c.text),
-          consequences: (s.consequences || []).map((c) => c.text),
-          existingSafeguards: (s.existingSafeguards || []).map((c) => c.text),
-          initialRisk: risk && risk.ok ? { band: risk.bandLabel, score: risk.score, basis: risk.basis, computedBy: 'application' } : 'not rated',
-          residualBasis: s.residualBasisKind || null,
-          recommendations: scoped('recommendations').filter((r) => r.scenarioId === s.id).map((r) => (r.recId || '') + ': ' + r.text),
-          status: s.reviewerStatus,
-        };
+  if (m.error) {
+    card.appendChild(h('div', { class: 'note crit small', text: m.error }));
+    return card;
+  }
+  if (!m.result) {
+    card.appendChild(h('p', { class: 'muted small' }, h('span', { class: 'spin' }), ' Working…'));
+    return card;
+  }
+
+  if (m.result.method) card.appendChild(h('p', { class: 'small' }, h('strong', { text: 'How it was done: ' }), m.result.method));
+  if (m.result.summary) card.appendChild(h('p', { style: { 'font-size': '12.5px' }, text: m.result.summary }));
+
+  const findings = m.result.findings || [];
+  if (findings.length === 0) {
+    card.appendChild(h('p', { class: 'muted small', text: 'Nothing found. That is a result, not a failure — say so in the report if it holds up.' }));
+    return card;
+  }
+
+  for (const f of findings) {
+    const row = h('div', { class: 'pass-finding' });
+    row.appendChild(
+      h(
+        'div',
+        { class: 'row', style: { gap: '5px', 'flex-wrap': 'wrap', 'margin-bottom': '3px' } },
+        f.confidence ? h('span', { class: 'tag', text: String(f.confidence).toLowerCase() + ' confidence' }) : null,
+        f.where ? h('span', { class: 'mono small muted', text: f.where }) : null
+      )
+    );
+    row.appendChild(h('div', { style: { 'font-size': '12.5px', 'font-weight': '500' }, text: f.title || '' }));
+    if (f.reasoning) row.appendChild(h('div', { class: 'small muted', text: f.reasoning }));
+    if (f.basedOn) row.appendChild(h('div', { class: 'small' }, h('strong', { text: 'From the project: ' }), f.basedOn));
+    if (f.action) {
+      row.appendChild(
+        h(
+          'div',
+          { class: 'btn-row', style: { 'margin-top': '5px' } },
+          f.accepted
+            ? h('span', { class: 'badge verified', text: 'ACCEPTED' })
+            : f.dismissed
+              ? h('span', { class: 'badge na', text: 'DISMISSED' })
+              : h(
+                  'div',
+                  { class: 'row', style: { gap: '5px' } },
+                  h('button', {
+                    class: 'btn sm primary',
+                    text: acceptLabel(f.action),
+                    onclick: async () => {
+                      const res = await applyWrite(f.action);
+                      toast(res.slice(0, 160), res.indexOf('Done') === 0 ? 'ok' : 'err');
+                      if (res.indexOf('Done') === 0) f.accepted = true;
+                      render();
+                    },
+                  }),
+                  h('button', { class: 'btn sm ghost', text: 'Not this one', onclick: () => { f.dismissed = true; render(); } })
+                )
+        )
+      );
+    }
+    card.appendChild(row);
+  }
+
+  card.appendChild(
+    h('p', { class: 'muted small', style: { 'margin-top': '8px' }, text: 'These are proposals from a model. Each one needs an engineer\'s judgement before it enters the study.' })
+  );
+  return card;
+}
+
+function acceptLabel(action) {
+  if (!action) return 'Accept';
+  if (action.op === 'create') return 'Add it';
+  if (action.op === 'update') return 'Apply it';
+  if (action.op === 'remove') return 'Remove it';
+  return 'Accept';
+}
+
+async function startPass(key) {
+  if (!aiAvailable() || S.chatBusy) return;
+  const p = REASONING_PASSES.find((x) => x.key === key);
+  if (!p) return;
+  const msg = { role: 'pass', pass: key, result: null, error: null };
+  S.chat.push(msg);
+  S.chatBusy = true;
+  S.chatStage = p.label + '…';
+  render();
+  controller = new AbortController();
+  try {
+    msg.result = await runPass(key, { signal: controller.signal });
+  } catch (e) {
+    msg.error = errorCopy(e);
+  } finally {
+    S.chatBusy = false;
+    S.chatStage = '';
+    controller = null;
+    render();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pending confirmations and the ledger
+// ---------------------------------------------------------------------------
+
+function pendingCard(q) {
+  return h(
+    'div',
+    { class: 'card pending-card' },
+    h(
+      'div',
+      { class: 'row', style: { gap: '6px', 'margin-bottom': '5px', 'flex-wrap': 'wrap' } },
+      h('span', { class: 'badge inferred', text: 'WAITING FOR YOU' }),
+      h('span', { class: 'tag', text: q.op + ' ' + q.collection })
+    ),
+    h('div', { style: { 'font-size': '12.5px' }, text: q.summary }),
+    q.patch ? h('div', { class: 'mono small muted', text: truncate(JSON.stringify(q.patch), 240) }) : null,
+    q.dropped && q.dropped.length
+      ? h('div', { class: 'small muted', text: 'Ignored fields: ' + q.dropped.join(', ') + '.' })
+      : null,
+    h(
+      'div',
+      { class: 'btn-row', style: { 'margin-top': '7px' } },
+      h('button', {
+        class: 'btn sm primary',
+        text: 'Apply',
+        onclick: async () => {
+          const res = await applyWrite(q);
+          clearPending(q.id);
+          S.chat.push({ role: 'system', text: res });
+          toast(res.slice(0, 160), res.indexOf('Done') === 0 ? 'ok' : 'err');
+          render();
+        },
       }),
-    };
-  });
+      h('button', {
+        class: 'btn sm ghost',
+        text: 'Decline',
+        onclick: () => {
+          clearPending(q.id);
+          S.chat.push({ role: 'system', text: 'You declined: ' + q.summary });
+          render();
+        },
+      })
+    )
+  );
+}
 
-  return {
-    project: { name: p.projectName, client: p.clientName, site: p.siteName, product: p.product, process: p.process, stage: p.processStage, revision: p.revision, processDescription: truncate(p.processDescription || '', 1400) },
-    jurisdiction: p.jurisdiction || {},
-    riskMatrix: { id: m.id, version: m.version, combine: m.combine, bands: m.bands.map((b) => ({ key: b.key, label: b.label, min: b.min, max: b.max, action: b.action })) },
-    completeness: { data: comp.data.percent, critical: comp.critical.percent, missingCritical: comp.critical.missing.slice(0, 20).map((x) => x.label) },
-    chemicals: chemicalsResolved().map((c) => ({
-      name: c.canonicalName,
-      cas: c.cas,
-      casValid: c.casValid,
-      quantity: c.quantity === null || c.quantity === undefined ? 'NOT RECORDED' : String(c.quantity) + ' ' + (c.quantityUnit || ''),
-      quantityStatus: c.quantityStatus,
-      state: c.physicalState,
-      classification: c.hazardousClassification || 'not recorded',
-      properties: scoped('chem_properties').filter((x) => x.chemicalId === c.id).map((x) => ({ key: x.key, value: x.value, unit: x.unit, status: x.status })),
-    })),
-    equipment: scoped('equipment').map((e) => ({ tag: e.tag, type: e.type, capacity: e.capacity, moc: e.materialOfConstruction, designPressure: e.designPressure, designTemperature: e.designTemperature, relief: e.reliefArrangement, agitator: e.agitator, heating: e.heatingSystem, cooling: e.coolingSystem })),
-    nodes,
-    hazardAlerts: al.alerts.slice(0, 12).map((a) => ({ rule: a.rule, severity: a.severity, title: a.title, fact: a.chain.fact, source: a.chain.source, mechanism: a.chain.mechanism, node: a.chain.node, arithmetic: a.arithmetic || null, computedBy: 'application' })),
-    dataGaps: al.gaps.slice(0, 15).map((g) => ({ chemical: g.chemicalName, property: g.propertyLabel, blocks: g.blocks })),
-    legal: {
-      counts: cc,
-      pendingQuestions: run ? run.pendingQuestions.map((q) => ({ question: q.question, fact: q.fact, gatesObligations: q.obligationCount })) : [],
-      records: complianceRegister().slice(0, 30).map((r) => ({
-        instrument: r.instrumentTitle,
-        section: r.sectionRuleSchedule,
-        obligation: r.topic,
-        applicability: r.effectiveStatus,
-        setBy: r.humanStatus ? 'reviewer' : r.setBy,
-        reasonFromApplication: r.humanReason || r.applicabilityReason,
-        missingFacts: r.missingFacts,
-        evidenceExpected: r.evidenceExpected,
-        evidenceHeld: (r.evidence || []).map((e) => e.title + (e.status === 'VERIFIED' ? ' (verified)' : ' (not verified)')),
-        thresholdConclusion: r.thresholdEvaluation ? r.thresholdEvaluation.conclusion : null,
-        thresholdArithmetic: r.thresholdEvaluation ? (r.thresholdEvaluation.results || []).map((x) => x.chemicalName + ': ' + (x.arithmetic || x.detail)).slice(0, 6) : null,
-        officialSource: ((r.sourceRefs || [])[0] || {}).url || null,
-        sourceStatus: ((r.sourceRefs || [])[0] || {}).sourceStatus || null,
-      })),
-      thresholdSets: thresholdSets().map((s) => ({ label: s.label, locator: s.locator, entriesEntered: s.entries.length, status: s.status })),
-    },
-    permits: permitStatuses().map((x) => ({ type: x.permitType, number: x.number, authority: x.issuingAuthority, expiry: x.expiryDate, renewal: x.renewalDate, computedStatus: x.expiry.status, daysRemaining: x.expiry.daysRemaining, computedBy: 'application' })),
-    recommendations: reg.kept.slice(0, 40).map((r) => ({ id: r.recId, node: r.nodeNumber, text: r.text, controlLevel: r.controlLevel, priority: r.priority, owner: r.responsibleDepartment, target: r.targetDate, status: r.status })),
-    qualityGate: gate ? { status: gate.status, blockingFailing: gate.blocking.filter((k) => !k.pass).map((k) => ({ check: k.label, detail: k.detail, fix: k.fixHint })), advisoryFailing: gate.advisory.filter((k) => !k.pass).map((k) => k.label) } : null,
-    team: scoped('team_members').map((t) => ({ name: t.name, role: t.role, department: t.department })),
-  };
+function ledgerPanel(rows) {
+  const live = rows.filter((r) => !r.undone);
+  const box = h('details', { class: 'chat-ledger' });
+  box.appendChild(
+    h('summary', { text: 'Changes the assistant made (' + live.length + ' live, ' + (rows.length - live.length) + ' undone)' })
+  );
+  for (const r of rows.slice(0, 20)) {
+    box.appendChild(
+      h(
+        'div',
+        { class: 'ledger-row' },
+        h(
+          'div',
+          { class: 'between' },
+          h('span', { class: 'mono small', text: r.op + ' ' + r.collection }),
+          h('span', { class: 'muted small', text: r.at ? dtFmt(r.at) : '' })
+        ),
+        h('div', { class: 'small', text: r.summary || '' }),
+        r.undone
+          ? h('span', { class: 'badge na', text: 'UNDONE' })
+          : h('button', { class: 'btn sm ghost', text: 'Undo', onclick: () => undoAction(r) })
+      )
+    );
+  }
+  return box;
+}
+
+function toolTrace(m) {
+  const calls = m.calls || [];
+  const box = h('details', { class: 'chat-tools' });
+  box.appendChild(h('summary', { text: calls.length + ' tool call' + (calls.length === 1 ? '' : 's') }));
+  for (const c of calls) {
+    box.appendChild(
+      h(
+        'div',
+        { class: 'tool-row' },
+        h('span', { class: 'mono small', text: c.tool }),
+        h('span', { class: 'tag', text: c.kind }),
+        h('span', { class: 'muted small', text: c.ms + ' ms' }),
+        c.ok ? null : h('span', { class: 'badge missing', text: 'FAILED' })
+      )
+    );
+  }
+  return box;
+}
+
+// ---------------------------------------------------------------------------
+// The turn
+// ---------------------------------------------------------------------------
+
+function instructions() {
+  const mode = S.chatAutonomy === 'ACT' ? 'ACT' : 'ASK';
+  return [
+    'You are the assistant inside HAZOP MASTER AI, a process-safety and compliance platform. You are talking to a process-safety engineer or a HAZOP facilitator. Write as one engineer to another: specific, plain, no padding.',
+    '',
+    'HOW YOU WORK',
+    '1. Call a tool before you answer anything about this project. You have no project knowledge except what the tools return. Start with get_worksheet, get_chemicals, get_legal, get_coverage, get_doability or get_gate depending on the question, and read get_reference before you propose a value for a coded field.',
+    '2. You do not calculate. Never multiply a likelihood by a severity, convert a unit, compare a quantity against a threshold or work out a renewal date. get_risk answers the first; the other three are already computed and the read tools return them. Say the figure is the application\'s.',
+    '3. Never state a process condition, capacity, design pressure, interlock, chemical property, SDS value or statutory threshold that a tool did not return. If it is not there, say what is missing and offer to raise it as a data gap.',
+    '4. Never say the facility is compliant, or that an obligation definitely applies. Those are the application\'s statuses and a reviewer\'s decision. For a legal answer, mark each part as a source fact, the application\'s analysis, or an open question.',
+    '',
+    'YOUR AUTHORITY',
+    mode === 'ACT'
+      ? '5. The user has set "Act and report". Make the change with create_record, update_record, delete_record or set_effort, then tell them what you did in one line. Every change carries an Undo, so a wrong change is cheap — but a change they did not ask for is not. Stay inside what they asked.'
+      : '5. The user has set "Ask first". A write tool queues the change and tells you so. When that happens, say it is waiting for their confirmation. Never describe a queued change as done.',
+    '6. A write tool\'s result is the only truth about what happened. If it starts "Refused" or "Failed", say so plainly and say what would fix it. Never claim a change the tool did not confirm.',
+    '7. Five acts you cannot perform, because they are signatures on an engineering document: marking a field VERIFIED, marking compliance evidence verified, closing a recommendation, approving a report, and entering a statutory threshold as verified. Call request_human_attestation to get the exact words to ask with.',
+    '',
+    'THINKING WELL ABOUT HAZOP',
+    '8. Before you propose a deviation, cause or safeguard, check get_coverage: the guideword engine already knows what the node should have examined, and repeating a row that exists wastes the team\'s time.',
+    '9. Challenge a safeguard by asking what it depends on. An alarm needs somebody present, trained and able to act in time; an interlock needs a tested trip; a relief device needs the right sizing case. Say which of those the project has recorded and which it has not.',
+    '10. A recommendation is worth having only if it is specific enough to close. Name the equipment tag, the setting, the frequency or the document. "Review the procedure" cannot be closed by anyone.',
+    '11. Prefer a control high in the hierarchy over one that depends on a person acting correctly. Say when you are proposing an administrative control because nothing better is available.',
+    '',
+    'FORMAT',
+    'Short paragraphs of plain text. No markdown headings, no bullet characters at the start of lines. Use the plant\'s own terms — node numbers, equipment tags, guidewords, R-numbers.',
+  ].join('\n');
 }
 
 async function send(text) {
   if (!aiAvailable() || S.chatBusy) return;
   S.chat.push({ role: 'user', text });
   S.chatBusy = true;
+  S.chatStage = 'Reading the project…';
   render();
 
-  const turns = [{ role: 'user', content: instructions() + '\n\nPROJECT STATE:\n' + JSON.stringify(projectState()).slice(0, 46000) }];
-  for (const m of S.chat.slice(-8)) {
+  const calls = [];
+  const trace = { role: 'tool', calls };
+  const tools = instrumentedTools({
+    mode: 'full',
+    log: (c) => {
+      calls.push(c);
+      S.chatStage = c.tool.replace(/_/g, ' ') + '…';
+      render();
+    },
+  });
+
+  const turns = [{ role: 'user', content: instructions() }];
+  for (const m of S.chat.slice(-10)) {
     if (m.role === 'user') turns.push({ role: 'user', content: m.text });
-    else if (m.role === 'ai') turns.push({ role: 'assistant', content: m.text });
+    else if (m.role === 'ai' && m.text) turns.push({ role: 'assistant', content: m.text });
   }
   if (turns[turns.length - 1].role !== 'user') turns.push({ role: 'user', content: text });
 
   controller = new AbortController();
   const msg = { role: 'ai', text: '' };
+  S.chat.push(trace);
   S.chat.push(msg);
   const runId = uid('airun');
   const started = Date.now();
 
   try {
     const out = await getAdapter().chat(turns, {
-      cache: false,
       signal: controller.signal,
+      tools,
       onText: ({ text: whole }) => {
         msg.text = whole;
+        S.chatStage = '';
         render();
       },
     });
-    msg.text = out.text;
-    const parsed = extractAction(out.text);
-    if (parsed.action) {
-      msg.text = parsed.text;
-      S.chat.push({ role: 'action', action: parsed.action });
-    }
-    await logChatRun(runId, started, out, null);
+    msg.text = out.text || msg.text;
+    if (!msg.text) msg.text = calls.length ? 'I read the project but produced no answer. Ask again, more narrowly.' : 'No answer came back. Try again.';
+    await logChatRun(runId, started, out, null, calls);
   } catch (e) {
     if (e && e.code === 'cancelled') {
       msg.text = (e.text || msg.text || '') + '\n\n[stopped]';
+    } else if (e && e.code === 'tools_unavailable') {
+      S.chat.pop();
+      S.chat.push({
+        role: 'system',
+        text:
+          'This view does not allow the assistant to call the application\'s tools, so it cannot read the project or change anything. The deterministic parts of the app are unaffected. Ask your question on a view where tool calling is available.',
+      });
     } else {
       S.chat.pop();
-      S.chat.push({ role: 'system', text: chatError(e) });
+      S.chat.push({ role: 'system', text: errorCopy(e) });
     }
-    await logChatRun(runId, started, null, e);
+    await logChatRun(runId, started, null, e, calls);
   } finally {
     S.chatBusy = false;
+    S.chatStage = '';
     controller = null;
     render();
   }
 }
 
-function chatError(e) {
+export function errorCopy(e) {
   const code = (e && e.code) || '';
   const map = {
     not_granted: 'You have not allowed this page to use Claude. The deterministic parts of the app are unaffected.',
     rate_limited: 'Too many requests, or your usage limit was reached. Try again in a little while.',
     session_expired: 'Your session expired — sign in again.',
-    prompt_too_large: 'This project is too large to send in one go. Ask about a single node or a single obligation.',
+    prompt_too_large:
+      'Too much went into that request. Ask about one node, one chemical or one obligation rather than the whole project.',
     refused: 'The assistant declined this request.',
-    invalid_json: 'The reply could not be read. Try asking again.',
+    invalid_json: 'The reply could not be read as the shape this pass needs. Try again.',
     sampling_disabled: 'Claude is not available for this account.',
+    tools_unavailable: 'This view does not allow tool calling, so the assistant cannot read or change the project here.',
+    cancelled: 'Stopped.',
   };
   return map[code] || 'The request failed' + (e && e.message ? ': ' + e.message : '') + '.';
 }
 
-async function logChatRun(runId, started, out, err) {
+async function logChatRun(runId, started, out, err, calls) {
   if (!S.store) return;
+  const writes = (calls || []).filter((c) => c.kind === 'write');
   try {
     await S.store.create(
       'ai_runs',
@@ -283,11 +553,16 @@ async function logChatRun(runId, started, out, err) {
         provider: getAdapter() ? getAdapter().name : 'unknown',
         modelTierRequested: 'default',
         modelTierApplied: out && out.modelTierApplied ? out.modelTierApplied : null,
-        promptVersion: 'chat-p1',
-        schemaVersion: 'chat-s1',
+        promptVersion: 'chat-p2',
+        schemaVersion: 'chat-s2',
         runtimeMs: Date.now() - started,
+        toolCalls: (calls || []).length,
+        toolNames: (calls || []).map((c) => c.tool),
+        writeCalls: writes.length,
+        autonomy: S.chatAutonomy || 'ASK',
         outputValid: !err,
         validationErrors: err ? [String((err && err.code) || err)] : null,
+        // Always true: nothing the assistant produces is a conclusion.
         humanReviewRequired: true,
         requestedBy: S.actor.id,
         createdAt: nowIso(),
@@ -296,65 +571,6 @@ async function logChatRun(runId, started, out, err) {
     );
   } catch (e) {
     /* logging failure must not break the chat */
-  }
-}
-
-const ALLOWED_ACTIONS = ['add_assumption', 'add_data_gap', 'add_recommendation', 'add_team_member', 'add_scenario_note'];
-
-function extractAction(text) {
-  const idx = text.lastIndexOf('ACTION:');
-  if (idx === -1) return { text, action: null };
-  const before = text.slice(0, idx).trim();
-  const raw = text.slice(idx + 7).trim();
-  let obj = null;
-  try {
-    const start = raw.indexOf('{');
-    const end = raw.lastIndexOf('}');
-    if (start !== -1 && end > start) obj = JSON.parse(raw.slice(start, end + 1));
-  } catch (e) {
-    obj = null;
-  }
-  if (!obj || ALLOWED_ACTIONS.indexOf(obj.kind) === -1 || !obj.summary) return { text: before || text, action: null };
-  return { text: before, action: { kind: obj.kind, summary: String(obj.summary).slice(0, 300), payload: obj.payload || {} } };
-}
-
-async function applyAction(m) {
-  const a = m.action;
-  const p = project();
-  if (!p) return;
-  const pl = a.payload || {};
-  try {
-    if (a.kind === 'add_assumption') {
-      await S.store.create('assumptions', { projectId: p.id, category: String(pl.category || 'Assistant').slice(0, 60), text: String(pl.text || a.summary).slice(0, 900), basis: String(pl.basis || 'Proposed by the assistant and confirmed by ' + (S.actor.name || 'a user')).slice(0, 300), raisedBy: S.actor.id }, { projectId: p.id, actorKind: 'ai', note: 'Confirmed by a user from the assistant panel' });
-    } else if (a.kind === 'add_data_gap') {
-      await S.store.create('data_gaps', { projectId: p.id, entityKind: String(pl.entityKind || 'project').slice(0, 30), field: String(pl.field || 'unspecified').slice(0, 60), label: String(pl.label || a.summary).slice(0, 160), blocks: Array.isArray(pl.blocks) ? pl.blocks.slice(0, 6).map(String) : [], detail: String(pl.detail || '').slice(0, 400), status: 'OPEN' }, { projectId: p.id, actorKind: 'ai' });
-    } else if (a.kind === 'add_recommendation') {
-      // A recommendation must attach to a real scenario; the assistant cannot
-      // invent one, and a residual rating is never set here.
-      const node = nodesSorted().filter((n) => String(n.nodeNumber) === String(pl.nodeNumber))[0];
-      const sc = node ? scoped('scenarios').filter((s) => s.nodeId === node.id && String(s.rowNumber) === String(pl.rowNumber))[0] : null;
-      if (!sc) {
-        toast('That row could not be found, so the recommendation was not added. Add it from the worksheet row instead.', 'err');
-        return;
-      }
-      const n = scoped('recommendations').length + 1;
-      await S.store.create('recommendations', { projectId: p.id, scenarioId: sc.id, nodeId: sc.nodeId, recId: 'R-' + String(n).padStart(3, '0'), text: String(pl.text || a.summary).slice(0, 700), technicalBasis: String(pl.technicalBasis || '').slice(0, 500), controlLevel: ['ELIMINATE', 'SUBSTITUTE', 'ENGINEERING', 'ADMINISTRATIVE', 'PPE'].indexOf(pl.controlLevel) !== -1 ? pl.controlLevel : null, priority: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].indexOf(pl.priority) !== -1 ? pl.priority : null, responsibleDepartment: String(pl.responsibleDepartment || '').slice(0, 120), status: 'OPEN', closureEvidenceRequired: true }, { projectId: p.id, actorKind: 'ai', note: 'Confirmed by a user from the assistant panel' });
-    } else if (a.kind === 'add_team_member') {
-      await S.store.create('team_members', { projectId: p.id, name: String(pl.name || '').slice(0, 120), designation: String(pl.designation || '').slice(0, 120), department: String(pl.department || '').slice(0, 120), organization: String(pl.organization || '').slice(0, 120), role: String(pl.role || 'other').slice(0, 40), serialNumber: scoped('team_members').length + 1, sortOrder: scoped('team_members').length, status: 'USER_CONFIRMED' }, { projectId: p.id, actorKind: 'ai' });
-    } else if (a.kind === 'add_scenario_note') {
-      const node = nodesSorted().filter((n) => String(n.nodeNumber) === String(pl.nodeNumber))[0];
-      const sc = node ? scoped('scenarios').filter((s) => s.nodeId === node.id && String(s.rowNumber) === String(pl.rowNumber))[0] : null;
-      if (!sc) {
-        toast('That row could not be found.', 'err');
-        return;
-      }
-      await S.store.update('scenarios', sc.id, { notes: String(pl.note || a.summary).slice(0, 600) }, { projectId: p.id, field: 'notes', actorKind: 'ai' });
-    }
-    m.applied = true;
-    toast('Applied', 'ok');
-    render();
-  } catch (e) {
-    toast('Could not apply: ' + ((e && e.message) || 'unknown error'), 'err');
   }
 }
 

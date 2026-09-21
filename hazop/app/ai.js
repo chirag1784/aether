@@ -54,6 +54,24 @@ export class SampleAdapter {
   async chat(turns, opts) {
     return this.sample(turns, opts);
   }
+
+  /** One structured answer from a prompt written by the caller. */
+  async json(prompt, opts) {
+    return this.sample.json(prompt, Object.assign({ modelTier: 'default', cache: false }, opts || {}));
+  }
+
+  /** Does this view allow function calling at all? */
+  async toolsAvailable() {
+    try {
+      const lim = this.sample.limits ? await this.sample.limits() : null;
+      if (!lim) return { ok: true, reason: 'UNKNOWN_LIMITS', maxCount: 8 };
+      if (!lim.tools || !lim.tools.maxCount) return { ok: false, reason: 'TOOLS_UNAVAILABLE' };
+      return { ok: true, maxCount: lim.tools.maxCount };
+    } catch (e) {
+      // An older runtime has no limits(); let the call itself decide.
+      return { ok: true, reason: 'LIMITS_UNREADABLE', maxCount: 8 };
+    }
+  }
 }
 
 export class HttpAdapter {
@@ -64,6 +82,14 @@ export class HttpAdapter {
 
   get available() {
     return false; // enabled in the Docker deployment, where the endpoint exists
+  }
+
+  async json(prompt, opts) {
+    throw Object.assign(new Error('Structured sampling is not available without the server endpoint.'), { code: 'sampling_disabled' });
+  }
+
+  async toolsAvailable() {
+    return { ok: false, reason: 'TOOLS_UNAVAILABLE' };
   }
 
   async generateStructured(task) {

@@ -18,6 +18,8 @@ import { renderLegal } from './views/legal.js';
 import { renderSources } from './views/sources.js';
 import { renderReports } from './views/reports.js';
 import { renderSettings } from './views/settings.js';
+import { renderResearch } from './views/research.js';
+import { attachMcp, openGaps } from './research.js';
 import { renderChat } from './views/chat.js';
 
 const RAIL = [
@@ -44,7 +46,7 @@ const RAIL = [
     items: [
       { key: 'nodes', label: 'Nodes', count: () => scoped('nodes').length, alert: () => scoped('nodes').some((n) => n.reviewStatus === 'PROPOSED') },
       { key: 'hazop', label: 'Worksheet', count: () => scoped('scenarios').length },
-      { key: 'risk', label: 'Risk matrix' },
+      { key: 'risk', label: 'Risk picture' },
       { key: 'recommendations', label: 'Recommendations', count: () => scoped('recommendations').length },
       { key: 'team', label: 'Team members', count: () => scoped('team_members').length },
     ],
@@ -52,6 +54,17 @@ const RAIL = [
   {
     group: 'Compliance',
     items: [{ key: 'legal', label: 'Legal register', count: () => complianceCounts().total, alert: () => complianceCounts().NOT_ENOUGH_DATA > 0 }],
+  },
+  {
+    group: 'Research',
+    items: [
+      {
+        key: 'research',
+        label: 'Missing data',
+        count: () => researchGapCount(),
+        alert: () => researchGapCount() > 0,
+      },
+    ],
   },
   {
     group: 'Output',
@@ -62,6 +75,25 @@ const RAIL = [
     ],
   },
 ];
+
+/**
+ * The rail badge for the research view. It counts the gaps that block
+ * something — a hazard check, a legal question, a critical property — not
+ * every field in the schema that happens to be empty. A badge reading 233
+ * tells a user nothing; one reading 14 tells them what to do next. The full
+ * figure is on the page itself.
+ *
+ * Recomputed at most once per paint: scanning every property of every
+ * chemical is cheap but not free, and the rail asks for it twice.
+ */
+function researchGapCount() {
+  if (!Object.prototype.hasOwnProperty.call(S.derivedCache, 'researchGapCount')) {
+    S.derivedCache.researchGapCount = S.projectId
+      ? openGaps().filter((g) => g.reasons.some((r) => r === 'BLOCKS_ALERT' || r === 'GATES_LEGAL' || r === 'CRITICAL_PROPERTY')).length
+      : 0;
+  }
+  return S.derivedCache.researchGapCount;
+}
 
 const VIEWS = {
   dashboard: renderDashboard,
@@ -76,6 +108,7 @@ const VIEWS = {
   hazop: renderHazop,
   risk: renderRisk,
   recommendations: renderRecommendations,
+  research: renderResearch,
   team: renderTeam,
   legal: renderLegal,
   sources: renderSources,
@@ -236,18 +269,23 @@ async function boot() {
 
   const claude = window.claude;
   if (claude && typeof claude.use === 'function') {
-    const [db, sample, user, downloads, assets] = await Promise.all([
+    const [db, sample, user, downloads, assets, mcp] = await Promise.all([
       claude.use('db').catch(() => null),
       claude.use('sample').catch(() => null),
       claude.use('user').catch(() => null),
       claude.use('downloads').catch(() => null),
       claude.use('assets').catch(() => null),
+      claude.use('mcp').catch(() => null),
     ]);
     caps.db = db;
     caps.sample = sample;
     caps.user = user;
     caps.downloads = downloads;
     caps.assets = assets;
+    caps.mcp = mcp;
+    // The research view calls the viewer's own connectors through this. Absence
+    // is the normal case; the view says so and offers the paste route instead.
+    attachMcp(mcp);
 
     if (sample) setAdapter(new SampleAdapter(sample));
     else setAdapter(new HttpAdapter());

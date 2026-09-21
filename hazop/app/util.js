@@ -22,6 +22,38 @@ export function h(tag, attrs) {
   return el;
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * The SVG counterpart of `h()`. SVG elements need their own namespace and
+ * have no `className` property, so they cannot go through `h()`.
+ * Text content still goes in through `textContent` — same rule as everywhere.
+ */
+export function svg(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  const a = attrs || {};
+  for (const k of Object.keys(a)) {
+    const v = a[k];
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'text') el.textContent = String(v);
+    else if (k === 'style') for (const sk of Object.keys(v)) el.style.setProperty(sk, v[sk]);
+    else if (k.slice(0, 2) === 'on' && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+    else el.setAttribute(k === 'class' ? 'class' : k, String(v));
+  }
+  const kids = Array.prototype.slice.call(arguments, 2);
+  addSvg(el, kids);
+  return el;
+}
+
+function addSvg(el, kids) {
+  for (const k of kids) {
+    if (k === null || k === undefined || k === false || k === '') continue;
+    if (Array.isArray(k)) addSvg(el, k);
+    else if (typeof k === 'string' || typeof k === 'number') el.appendChild(document.createTextNode(String(k)));
+    else el.appendChild(k);
+  }
+}
+
 function add(el, kids) {
   for (const k of kids) {
     if (k === null || k === undefined || k === false || k === '') continue;

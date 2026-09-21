@@ -244,6 +244,17 @@ export function tolerability(matrix, bandKey) {
   return { action: band.action, reason: 'MATRIX_BAND_ACTION' };
 }
 
+/**
+ * Does this band oblige someone to act? `ACTION_REQUIRED` and
+ * `ACTION_MANDATORY` say yes; an ALARP review that the project has disabled
+ * falls through to `ACTION_REQUIRED` in `tolerability()` and so also says yes.
+ * Used wherever "how many scenarios are still unacceptable" is counted.
+ */
+export function requiresAction(matrix, bandKey) {
+  const t = tolerability(matrix, bandKey);
+  return t.action === 'ACTION_REQUIRED' || t.action === 'ACTION_MANDATORY';
+}
+
 /** Bands ranked at or above the given band key — used by the quality gate. */
 export function bandsAtOrAbove(matrix, bandKey) {
   const m = matrix || DEFAULT_MATRIX;

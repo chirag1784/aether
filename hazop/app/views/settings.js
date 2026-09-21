@@ -2,7 +2,9 @@
 // deployment facts a user needs to know about where their data lives.
 
 import { h, field, input, select, textarea, toast, emptyState, sectionRule, tile, tableWrap, dtFmt } from '../util.js';
-import { S, render, project, scoped } from '../state.js';
+import { S, render, project, scoped, go } from '../state.js';
+import { AUTONOMY, HUMAN_ONLY } from '../ai-tools.js';
+import { ROUTES, routeAvailability, loadConnectors, DECLARED_SERVERS } from '../research.js';
 import { aiAvailable, getAdapter, PROMPT_VERSION, SCHEMA_VERSION, AI_LAYER_VERSION } from '../ai.js';
 import { engineVersions } from '../exports.js';
 import { LEGAL_LIBRARY_VERSION, LEGAL_LIBRARY_SEEDED_AT, LEGAL_INSTRUMENTS, LEGAL_OBLIGATIONS } from '../../packages/legal/library.js';
@@ -55,9 +57,90 @@ export function renderSettings() {
     )
   );
 
+  // ------------------------------------------------ the assistant's authority
+  page.appendChild(sectionRule('The assistant\'s authority'));
+  const autoSel = select(AUTONOMY.map((a) => ({ value: a.key, label: a.label })), S.chatAutonomy || 'ASK', { id: 'st-autonomy' });
+  autoSel.addEventListener('change', () => {
+    S.chatAutonomy = autoSel.value;
+    toast('The assistant will now ' + (autoSel.value === 'ACT' ? 'make changes and report them, with an Undo on each.' : 'propose each change for you to confirm.'), 'ok');
+    render();
+  });
+  page.appendChild(
+    h(
+      'div',
+      { class: 'card' },
+      field('When the assistant changes something', autoSel, (AUTONOMY.find((a) => a.key === (S.chatAutonomy || 'ASK')) || {}).note),
+      h('p', { class: 'card-note', text: 'The assistant reads every collection and every engine result, and writes records through the same audited path your own edits take. Every change it makes is listed in the assistant panel with an Undo. This setting only decides whether it asks first.' }),
+      h('div', { class: 'grid c2' },
+        h('div', {}, h('div', { class: 'tile-label', text: 'It may' }), h('ul', { class: 'list-compact small' }, ['Create, change and delete records in every collection the app tracks', 'Declare the effort on a recommendation, and rate residual risk through the same validator your edits pass', 'Raise data gaps, assumptions, recommendations and team members', 'Run the reasoning passes and propose findings one at a time', 'Move you to a view so you can see what it is talking about'].map((x) => h('li', { text: x })))),
+        h('div', {}, h('div', { class: 'tile-label', text: 'It will refuse' }), h('ul', { class: 'list-compact small' }, HUMAN_ONLY.map((x) => h('li', { text: x.act + ' — that is for ' + x.who + '.' })).concat([h('li', { text: 'Calculating anything. Risk scores, unit conversions, threshold comparisons and renewal dates come from the engines; it quotes them.' })])))
+      ),
+      h('p', { class: 'card-note', text: 'The five refusals are signatures on an engineering document rather than limits on capability. Nothing the assistant produces is ever recorded as VERIFIED.' })
+    )
+  );
+
   // ---------------------------------------------------------- research
+  page.appendChild(sectionRule('Research routes'));
+  // Ask the runtime which of the declared connectors the viewer actually has,
+  // so this is a choice rather than a guess. Listing never prompts them.
+  loadConnectors();
+  const seen = S.researchConnectorsSeen;
+  const connectorControl =
+    seen && seen.length
+      ? (() => {
+          const sel = select(
+            [{ value: '', label: '— none —' }].concat(seen.map((x) => ({ value: x, label: x }))),
+            S.researchConnector || '',
+            { id: 'st-connector' }
+          );
+          sel.addEventListener('change', () => {
+            S.researchConnector = sel.value;
+            toast(sel.value ? 'The research view will search with "' + sel.value + '".' : 'Connector cleared; the paste route stays available.', 'ok');
+            render();
+          });
+          return sel;
+        })()
+      : h('p', {
+          class: 'muted small',
+          text:
+            DECLARED_SERVERS.length === 0
+              ? 'No connector is named by this page.'
+              : seen === undefined
+                ? 'Checking which connectors this view can reach…'
+                : 'None of the connectors this page names is on your account.',
+        });
+  const avail = routeAvailability();
+  page.appendChild(
+    h(
+      'div',
+      { class: 'card' },
+      h('p', { class: 'card-note', text: 'This page cannot reach the internet by itself — the runtime blocks every request except to a few script CDNs. Four routes bring an outside fact in, and each one is labelled on the record it produces.' }),
+      field(
+        'Search with',
+        connectorControl,
+        DECLARED_SERVERS.length
+          ? 'Only a connector this page names can be called, and that list is fixed when the page is published. It names: ' +
+            DECLARED_SERVERS.map((x) => x.server).join(', ') +
+            '. The first call asks your permission and runs with your own credentials — this page never sees a token.'
+          : 'This page names no connector. A page may only call a connector that exists on the account it was published from, and that account has no web-search or fetch connector — so there is nothing to name yet. Add one to your claude.ai connectors, tell whoever publishes this page its display name, and the route opens with a one-line change. Until then the paste route does the same job with a citation you chose yourself.'
+      ),
+      h(
+        'div',
+        { class: 'stack' },
+        ROUTES.map((r) =>
+          h(
+            'div',
+            { class: 'between', style: { padding: '5px 0', 'border-top': '1px solid var(--line)' } },
+            h('div', {}, h('div', { style: { 'font-weight': '500', 'font-size': '12.5px' }, text: r.label }), h('div', { class: 'small muted', text: avail[r.key].available ? r.note : avail[r.key].why })),
+            avail[r.key].available ? h('span', { class: 'badge verified', text: 'AVAILABLE' }) : h('span', { class: 'badge na', text: 'NOT HERE' })
+          )
+        )
+      ),
+      h('button', { class: 'btn sm', style: { 'margin-top': '8px' }, text: 'Open the research view', onclick: () => go('research') })
+    )
+  );
+
   if (p) {
-    page.appendChild(sectionRule('Research (this project)'));
     page.appendChild(
       h(
         'div',
